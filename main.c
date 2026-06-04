@@ -2,6 +2,13 @@
 #include <errno.h>
 #include <limits.h>
 #include <ncurses.h>
+
+#ifndef BUTTON5_PRESSED
+#define BUTTON5_PRESSED NCURSES_MOUSE_MASK(5, NCURSES_BUTTON_PRESSED)
+#endif
+#ifndef BUTTON4_PRESSED
+#define BUTTON4_PRESSED NCURSES_MOUSE_MASK(4, NCURSES_BUTTON_PRESSED)
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +30,8 @@ typedef struct {
   int screen_rows;
   int screen_cols;
   int output_visible;
+  int output_scroll;
+  int scroll_focus;
   int lang_popup_visible;
   int lang_selection;
   char *output_text;
@@ -97,6 +106,10 @@ static void scroll_editor(Editor *ed) {
   int cursor_screen_y = visible_rows_before(&ed->folds, ed->cy);
   int offset_screen_y = visible_rows_before(&ed->folds, ed->row_offset);
   int f;
+  int scroll_margin = 3;
+
+  if (rows < 10) scroll_margin = 1;
+  else if (rows < 15) scroll_margin = 2;
 
   if (!is_fold_start_row(&ed->folds, ed->cy)) {
     for (f = 0; f < ed->folds.count; f++) {
@@ -109,12 +122,18 @@ static void scroll_editor(Editor *ed) {
     if (fr < ed->row_offset) offset_screen_y++;
   }
 
-  if (cursor_screen_y < offset_screen_y) {
-    ed->row_offset = ed->cy;
-  }
-  if (cursor_screen_y >= offset_screen_y + rows) {
+  if (cursor_screen_y < offset_screen_y + scroll_margin) {
     int target = ed->cy;
-    int needed = rows - 1;
+    int needed = scroll_margin;
+    while (target > 0 && needed > 0) {
+      target--;
+      if (!folds_is_hidden_row(&ed->folds, target) || is_fold_start_row(&ed->folds, target)) needed--;
+    }
+    ed->row_offset = target;
+  }
+  if (cursor_screen_y >= offset_screen_y + rows - scroll_margin) {
+    int target = ed->cy;
+    int needed = rows - 1 - scroll_margin;
     while (target > 0 && needed > 0) {
       target--;
       if (!folds_is_hidden_row(&ed->folds, target) || is_fold_start_row(&ed->folds, target)) needed--;
@@ -128,29 +147,19 @@ static void scroll_editor(Editor *ed) {
   }
 }
 
-static const char *tail_start(const char *text, int max_lines) {
-  const char *start = text;
-  const char *p;
-  int lines = 0;
-
-  if (!text || max_lines <= 0) return "";
-
-  for (p = text; *p; p++) {
-    if (*p == '\n') lines++;
+static int count_output_screen_rows(const char *text, int screen_cols) {
+  int total = 0;
+  const char *line_start = text;
+  if (!text || !text[0] || screen_cols <= 0) return 0;
+  while (*line_start) {
+    const char *nl = strchr(line_start, '\n');
+    int line_len = nl ? (int)(nl - line_start) : (int)strlen(line_start);
+    int rows = (line_len > 0) ? ((line_len - 1) / screen_cols + 1) : 1;
+    total += rows;
+    if (!nl) break;
+    line_start = nl + 1;
   }
-  if (lines <= max_lines) return text;
-
-  for (p = text + strlen(text); p > text; p--) {
-    if (p[-1] == '\n') {
-      lines--;
-      if (lines <= max_lines) {
-        start = p;
-        break;
-      }
-    }
-  }
-
-  return start;
+  return total;
 }
 
 static const char *lang_names[] = {
@@ -205,9 +214,15 @@ static void draw_lang_popup(Editor *ed) {
 static void draw_status(Editor *ed) {
   char line[512];
 
-  snprintf(line, sizeof(line),
-           "%s  Ln %d, Col %d  |  ^S Save  ^R Run  ^L Lang  ^F Fold  ^O Output  ^Q Quit",
-           ed->filename, ed->cy + 1, ed->cx + 1);
+  if (ed->output_visible && ed->scroll_focus) {
+    snprintf(line, sizeof(line),
+             "%s  Output [focused] (Up/Dn scroll)  |  ^O Close  ^Q Quit",
+             ed->filename);
+  } else {
+    snprintf(line, sizeof(line),
+             "%s  Ln %d, Col %d  |  ^S Save  ^R Run  ^L Lang  ^F Fold  ^O Output  ^Q Quit",
+             ed->filename, ed->cy + 1, ed->cx + 1);
+  }
   if (has_colors()) {
     attron(COLOR_PAIR(2) | A_BOLD);
   } else {
@@ -279,10 +294,15 @@ static void draw_output(Editor *ed) {
   int panel_h = output_height(ed);
   int panel_top = ed->screen_rows - panel_h;
   int content_rows = panel_h - 1;
-  int i;
-  const char *cursor;
+  const char *text;
+  int total_screen_rows;
+  int screen_row;
+  int scrolled = 0;
 
   if (panel_h <= 0) return;
+
+  text = ed->output_text ? ed->output_text : "";
+  total_screen_rows = count_output_screen_rows(text, ed->screen_cols);
 
   if (has_colors()) {
     attron(COLOR_PAIR(2) | A_BOLD);
@@ -290,7 +310,17 @@ static void draw_output(Editor *ed) {
     attron(A_REVERSE);
   }
   mvhline(panel_top, 0, ' ', ed->screen_cols);
-  mvaddnstr(panel_top, 0, "Output", ed->screen_cols);
+  {
+    char header[64];
+    if (ed->output_scroll > 0 && total_screen_rows > 0) {
+      int bottom = ed->output_scroll + content_rows;
+      if (bottom > total_screen_rows) bottom = total_screen_rows;
+      snprintf(header, sizeof(header), "Output %d-%d/%d", ed->output_scroll + 1, bottom, total_screen_rows);
+    } else {
+      snprintf(header, sizeof(header), "Output");
+    }
+    mvaddnstr(panel_top, 0, header, ed->screen_cols);
+  }
   if (has_colors()) {
     attroff(COLOR_PAIR(2) | A_BOLD);
   } else {
@@ -300,19 +330,54 @@ static void draw_output(Editor *ed) {
   if (has_colors()) {
     attron(COLOR_PAIR(3));
   }
-  cursor = tail_start(ed->output_text ? ed->output_text : "", content_rows);
-  for (i = 0; i < content_rows; i++) {
-    int row = panel_top + 1 + i;
-    const char *nl = strchr(cursor, '\n');
-    int len = nl ? (int)(nl - cursor) : (int)strlen(cursor);
 
-    move(row, 0);
-    clrtoeol();
-    if (len > 0) mvaddnstr(row, 0, cursor, ed->screen_cols);
+  screen_row = panel_top + 1;
+  {
+    const char *line_start = text;
+    while (*line_start && screen_row <= panel_top + content_rows) {
+      const char *nl = strchr(line_start, '\n');
+      int line_len = nl ? (int)(nl - line_start) : (int)strlen(line_start);
+      int col = 0;
 
-    if (!nl) break;
-    cursor = nl + 1;
+      if (line_len == 0) {
+        if (scrolled >= ed->output_scroll) {
+          move(screen_row, 0);
+          clrtoeol();
+          screen_row++;
+        } else {
+          scrolled++;
+        }
+        if (!nl) break;
+        line_start = nl + 1;
+        continue;
+      }
+
+      while (col < line_len && screen_row <= panel_top + content_rows) {
+        int chunk = line_len - col;
+        if (chunk > ed->screen_cols) chunk = ed->screen_cols;
+
+        if (scrolled >= ed->output_scroll) {
+          move(screen_row, 0);
+          clrtoeol();
+          mvaddnstr(screen_row, 0, line_start + col, chunk);
+          screen_row++;
+        } else {
+          scrolled++;
+        }
+        col += chunk;
+      }
+
+      if (!nl) break;
+      line_start = nl + 1;
+    }
   }
+
+  while (screen_row <= panel_top + content_rows) {
+    move(screen_row, 0);
+    clrtoeol();
+    screen_row++;
+  }
+
   if (has_colors()) {
     attroff(COLOR_PAIR(3));
   }
@@ -435,6 +500,10 @@ static void process_keypress(Editor *ed) {
 
     case CTRL_KEY('o'):
       ed->output_visible = !ed->output_visible;
+      if (!ed->output_visible) {
+        ed->output_scroll = 0;
+        ed->scroll_focus = 0;
+      }
       break;
 
     case CTRL_KEY('l'):
@@ -450,23 +519,82 @@ static void process_keypress(Editor *ed) {
       break;
     }
 
+    case KEY_MOUSE: {
+      MEVENT ev;
+      if (getmouse(&ev) == OK) {
+        int panel_top = ed->output_visible ? ed->screen_rows - output_height(ed) : ed->screen_rows;
+        if (ed->output_visible && ev.y >= panel_top) {
+          ed->scroll_focus = 1;
+        } else if (ev.y < panel_top) {
+          ed->scroll_focus = 0;
+        }
+        if (ev.bstate & BUTTON4_PRESSED) {
+          if (ed->scroll_focus && ed->output_visible) {
+            if (ed->output_scroll > 0) ed->output_scroll--;
+            else ed->scroll_focus = 0;
+          } else {
+            if (ed->cy > 0) {
+              ed->cy--;
+              while (ed->cy > 0 &&
+                     folds_is_hidden_row(&ed->folds, ed->cy) &&
+                     !is_fold_start_row(&ed->folds, ed->cy))
+                ed->cy--;
+            }
+          }
+        }
+        if (ev.bstate & BUTTON5_PRESSED) {
+          if (ed->scroll_focus && ed->output_visible) {
+            int total = count_output_screen_rows(ed->output_text ? ed->output_text : "", ed->screen_cols);
+            int visible = output_height(ed) - 1;
+            if (ed->output_scroll < total - visible)
+              ed->output_scroll++;
+            else
+              ed->scroll_focus = 0;
+          } else {
+            if (ed->cy + 1 < ed->buffer.line_count) {
+              ed->cy++;
+              while (ed->cy + 1 < ed->buffer.line_count &&
+                     folds_is_hidden_row(&ed->folds, ed->cy) &&
+                     !is_fold_start_row(&ed->folds, ed->cy))
+                ed->cy++;
+            }
+          }
+        }
+      }
+      break;
+    }
+
     case KEY_UP:
-      if (ed->cy > 0) {
-        ed->cy--;
-        while (ed->cy > 0 &&
-               folds_is_hidden_row(&ed->folds, ed->cy) &&
-               !is_fold_start_row(&ed->folds, ed->cy))
+      if (ed->scroll_focus && ed->output_visible) {
+        if (ed->output_scroll > 0) ed->output_scroll--;
+        else ed->scroll_focus = 0;
+      } else {
+        if (ed->cy > 0) {
           ed->cy--;
+          while (ed->cy > 0 &&
+                 folds_is_hidden_row(&ed->folds, ed->cy) &&
+                 !is_fold_start_row(&ed->folds, ed->cy))
+            ed->cy--;
+        }
       }
       break;
 
     case KEY_DOWN:
-      if (ed->cy + 1 < ed->buffer.line_count) {
-        ed->cy++;
-        while (ed->cy + 1 < ed->buffer.line_count &&
-               folds_is_hidden_row(&ed->folds, ed->cy) &&
-               !is_fold_start_row(&ed->folds, ed->cy))
+      if (ed->scroll_focus && ed->output_visible) {
+        int total = count_output_screen_rows(ed->output_text ? ed->output_text : "", ed->screen_cols);
+        int visible = output_height(ed) - 1;
+        if (ed->output_scroll < total - visible)
+          ed->output_scroll++;
+        else
+          ed->scroll_focus = 0;
+      } else {
+        if (ed->cy + 1 < ed->buffer.line_count) {
           ed->cy++;
+          while (ed->cy + 1 < ed->buffer.line_count &&
+                 folds_is_hidden_row(&ed->folds, ed->cy) &&
+                 !is_fold_start_row(&ed->folds, ed->cy))
+            ed->cy++;
+        }
       }
       break;
 
@@ -519,6 +647,18 @@ static void process_keypress(Editor *ed) {
       break;
 
     case KEY_RESIZE:
+      break;
+
+    case '\t':
+      if (cursor_on_folded_row(ed)) {
+        set_status(ed, "Unfold the collapsed line before editing.");
+      } else {
+        int t;
+        for (t = 0; t < 4; t++) {
+          buffer_insert_char(&ed->buffer, ed->cy, ed->cx, ' ');
+          ed->cx++;
+        }
+      }
       break;
 
     default:
@@ -580,6 +720,8 @@ static void init_ncurses(void) {
   noecho();
   keypad(stdscr, TRUE);
   set_escdelay(25);
+  mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED, NULL);
+  mouseinterval(0);
 }
 
 static void fetch_progress(void *ctx) {
