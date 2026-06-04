@@ -1,6 +1,8 @@
 #ifndef RUNNER_H
 #define RUNNER_H
 
+#include "buffer.h"
+
 typedef enum {
   RUN_OK = 0,
   RUN_COMPILE_ERROR = 1,
@@ -10,5 +12,6 @@ typedef enum {
 
 RunResult runner_smart_run(const char *file_path, const char *lang_override, char **output);
 int runner_fetch_url(const char *url, char **content);
+int runner_fetch_url_stream(const char *url, TextBuffer *buf, void (*on_progress)(void *ctx), void *ctx);
 
 #endif

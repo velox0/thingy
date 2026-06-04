@@ -69,6 +69,7 @@ typedef struct {
 
 void buffer_init(TextBuffer *buf);
 void buffer_free(TextBuffer *buf);
+int ensure_line_capacity(TextBuffer *buf, int needed);
 
 int buffer_load_file(TextBuffer *buf, const char *path, char *err, size_t err_size);
 int buffer_save_file(const TextBuffer *buf, const char *path, char *err, size_t err_size);

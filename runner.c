@@ -419,3 +419,95 @@ int runner_fetch_url(const char *url, char **content) {
   }
   return 0;
 }
+
+typedef struct {
+  TextBuffer *buf;
+  char *partial;
+  void (*on_progress)(void *ctx);
+  void *progress_ctx;
+} StreamCtx;
+
+static size_t stream_write_callback(void *ptr, size_t size, size_t nmemb, void *userdata) {
+  StreamCtx *ctx = (StreamCtx *)userdata;
+  size_t chunk_len = size * nmemb;
+  char *combined;
+  size_t combined_len;
+  char *nl;
+
+  combined_len = strlen(ctx->partial) + chunk_len;
+  combined = malloc(combined_len + 1);
+  if (!combined) return 0;
+  memcpy(combined, ctx->partial, strlen(ctx->partial));
+  memcpy(combined + strlen(ctx->partial), ptr, chunk_len);
+  combined[combined_len] = '\0';
+  free(ctx->partial);
+  ctx->partial = combined;
+
+  while ((nl = strchr(ctx->partial, '\n')) != NULL) {
+    size_t line_len = (size_t)(nl - ctx->partial);
+    char *line = malloc(line_len + 1);
+    if (line) {
+      memcpy(line, ctx->partial, line_len);
+      line[line_len] = '\0';
+      ensure_line_capacity(ctx->buf, ctx->buf->line_count + 1);
+      ctx->buf->lines[ctx->buf->line_count++] = line;
+    }
+    {
+      char *rest = dup_str(nl + 1);
+      free(ctx->partial);
+      ctx->partial = rest;
+    }
+  }
+  if (ctx->on_progress) ctx->on_progress(ctx->progress_ctx);
+  return chunk_len;
+}
+
+int runner_fetch_url_stream(const char *url, TextBuffer *buf, void (*on_progress)(void *progress_ctx), void *progress_ctx) {
+  CURLM *multi;
+  CURL *curl;
+  int running = 0;
+  long http_code = 0;
+  StreamCtx ctx;
+  CURLMsg *msg;
+
+  ctx.buf = buf;
+  ctx.partial = dup_str("");
+  ctx.on_progress = on_progress;
+  ctx.progress_ctx = progress_ctx;
+
+  curl = curl_easy_init();
+  if (!curl) {
+    free(ctx.partial);
+    return -1;
+  }
+
+  multi = curl_multi_init();
+  curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, stream_write_callback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+  curl_multi_add_handle(multi, curl);
+
+  do {
+    curl_multi_perform(multi, &running);
+    if (running) curl_multi_wait(multi, NULL, 0, 50, NULL);
+  } while (running);
+
+  if (ctx.partial[0]) {
+    ensure_line_capacity(buf, buf->line_count + 1);
+    buf->lines[buf->line_count++] = ctx.partial;
+  } else {
+    free(ctx.partial);
+  }
+
+  msg = curl_multi_info_read(multi, &running);
+  if (msg) curl_easy_getinfo(msg->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
+
+  curl_multi_remove_handle(multi, curl);
+  curl_multi_cleanup(multi);
+  curl_easy_cleanup(curl);
+
+  if (http_code != 200) return -1;
+  return 0;
+}

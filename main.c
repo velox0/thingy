@@ -334,8 +334,9 @@ static void run(Editor *ed) {
   char err[256];
   char tmppath[PATH_MAX];
   const char *ext;
+  int is_url = (strncmp(ed->filename, "http://", 7) == 0 || strncmp(ed->filename, "https://", 8) == 0);
 
-  if (save_file(ed) != 0) return;
+  if (!is_url && save_file(ed) != 0) return;
 
   ext = strrchr(ed->filename, '.');
   {
@@ -566,8 +567,33 @@ static void refresh_screen(Editor *ed) {
   refresh();
 }
 
+static void init_ncurses(void) {
+  initscr();
+  if (has_colors()) {
+    start_color();
+    init_pair(1, 218, 234);
+    init_pair(2, 234, 218);
+    init_pair(3, 114, 234);
+    init_pair(4, 197, 234);
+  }
+  raw();
+  noecho();
+  keypad(stdscr, TRUE);
+  set_escdelay(25);
+}
+
+static void fetch_progress(void *ctx) {
+  Editor *ed = (Editor *)ctx;
+  getmaxyx(stdscr, ed->screen_rows, ed->screen_cols);
+  erase();
+  draw_status(ed);
+  draw_editor_area(ed);
+  refresh();
+}
+
 static int init_editor(Editor *ed, const char *filename) {
   char err[256];
+  int is_url;
 
   memset(ed, 0, sizeof(*ed));
   buffer_init(&ed->buffer);
@@ -576,31 +602,37 @@ static int init_editor(Editor *ed, const char *filename) {
 
   snprintf(ed->filename, sizeof(ed->filename), "%s",
            (filename && filename[0]) ? filename : "untitled.txt");
-  if (buffer_load_file(&ed->buffer, ed->filename, err, sizeof(err)) != 0) {
-    set_status(ed, "Load failed: %s", err);
+
+  is_url = filename && (strncmp(filename, "http://", 7) == 0 || strncmp(filename, "https://", 8) == 0);
+
+  if (is_url) {
+    init_ncurses();
+    set_status(ed, "Fetching %s ...", filename);
+    getmaxyx(stdscr, ed->screen_rows, ed->screen_cols);
+    erase();
+    draw_status(ed);
+    draw_editor_area(ed);
+    refresh();
+
+    ed->buffer.line_count = 0;
+    if (runner_fetch_url_stream(filename, &ed->buffer, fetch_progress, ed) != 0) {
+      set_status(ed, "Fetch failed.");
+    } else {
+      set_status(ed, "Fetched %s", filename);
+    }
+    if (ed->buffer.line_count <= 0) {
+      ensure_line_capacity(&ed->buffer, 1);
+      ed->buffer.lines[0] = dup_str("");
+      ed->buffer.line_count = 1;
+    }
   } else {
-    set_status(ed, "Opened %s", ed->filename);
+    if (buffer_load_file(&ed->buffer, ed->filename, err, sizeof(err)) != 0) {
+      set_status(ed, "Load failed: %s", err);
+    } else {
+      set_status(ed, "Opened %s", ed->filename);
+    }
+    init_ncurses();
   }
-
-  initscr();
-  if (has_colors()) {
-    start_color();
-    // Sakura Palette:
-    // BG: Deep Purple/Black (234)
-    // FG: Soft White (255)
-    // Accent 1 (Sakura Pink): 211 or 218
-    // Accent 2 (Darker Pink): 197
-    // Accent 3 (Leaf Green): 114
-
-    init_pair(1, 218, 234); // Editor: Pink on Dark
-    init_pair(2, 234, 218); // Status: Dark on Pink
-    init_pair(3, 114, 234); // Output: Green on Dark
-    init_pair(4, 197, 234); // Special: Red/Dark Pink on Dark
-  }
-  raw();
-  noecho();
-  keypad(stdscr, TRUE);
-  set_escdelay(25);
   return 0;
 }
 

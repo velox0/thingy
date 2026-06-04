@@ -22,7 +22,7 @@ static char *dup_nstr(const char *s, size_t n) {
   return copy;
 }
 
-static int ensure_line_capacity(TextBuffer *buf, int needed) {
+int ensure_line_capacity(TextBuffer *buf, int needed) {
   int new_capacity;
   char **new_lines;
 
