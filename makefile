@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -pedantic -std=c99
-LDLIBS = -lncurses
+LDLIBS = -lncurses -lcurl
 OBJS = main.o buffer.o runner.o
 
 all: thingy

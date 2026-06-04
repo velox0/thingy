@@ -9,5 +9,6 @@ typedef enum {
 } RunResult;
 
 RunResult runner_smart_run(const char *file_path, const char *lang_override, char **output);
+int runner_fetch_url(const char *url, char **content);
 
 #endif

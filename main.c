@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <errno.h>
 #include <limits.h>
 #include <ncurses.h>
 #include <stdarg.h>
@@ -610,6 +611,7 @@ int main(int argc, char **argv) {
     const char *ext;
     RunResult result;
     char *output = NULL;
+    int is_url = 0;
 
     for (i = 2; i < argc; i++) {
       if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc) {
@@ -620,19 +622,50 @@ int main(int argc, char **argv) {
     }
 
     if (!path) {
-      fprintf(stderr, "Usage: thingy --run [--lang <lang>] <file>\n");
+      fprintf(stderr, "Usage: thingy --run [--lang <lang>] <file|url>\n");
       return 1;
     }
+
+    is_url = (strncmp(path, "http://", 7) == 0 || strncmp(path, "https://", 8) == 0);
 
     buffer_init(&buf);
-    if (buffer_load_file(&buf, path, err, sizeof(err)) != 0) {
-      fprintf(stderr, "Error loading %s: %s\n", path, err);
-      buffer_free(&buf);
-      return 1;
+    if (is_url) {
+      char *content = NULL;
+      FILE *fp;
+      if (runner_fetch_url(path, &content) != 0 || !content) {
+        fprintf(stderr, "Error fetching URL: %s\n", path);
+        buffer_free(&buf);
+        return 1;
+      }
+      snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_url_%d.tmp", getpid());
+      fp = fopen(tmppath, "w");
+      if (!fp) {
+        fprintf(stderr, "Error writing temp file: %s\n", strerror(errno));
+        free(content);
+        buffer_free(&buf);
+        return 1;
+      }
+      fputs(content, fp);
+      fclose(fp);
+      free(content);
+      if (buffer_load_file(&buf, tmppath, err, sizeof(err)) != 0) {
+        fprintf(stderr, "Error loading fetched content: %s\n", err);
+        remove(tmppath);
+        buffer_free(&buf);
+        return 1;
+      }
+      remove(tmppath);
+      snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_cli_%d.c", getpid());
+    } else {
+      if (buffer_load_file(&buf, path, err, sizeof(err)) != 0) {
+        fprintf(stderr, "Error loading %s: %s\n", path, err);
+        buffer_free(&buf);
+        return 1;
+      }
+      ext = strrchr(path, '.');
+      snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_cli_%d%s", getpid(), ext ? ext : ".c");
     }
 
-    ext = strrchr(path, '.');
-    snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_cli_%d%s", getpid(), ext ? ext : ".c");
     if (buffer_save_file_filtered(&buf, tmppath, err, sizeof(err)) != 0) {
       fprintf(stderr, "Error preparing file: %s\n", err);
       buffer_free(&buf);

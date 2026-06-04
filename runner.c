@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <curl/curl.h>
 
 static char *dup_str(const char *s) {
   size_t len = strlen(s);
@@ -370,4 +371,42 @@ RunResult runner_smart_run(const char *file_path, const char *lang_override, cha
   free(q_file);
   free(q_cwd);
   return (run_code == 0) ? RUN_OK : RUN_EXEC_ERROR;
+}
+
+static size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata) {
+  char **buf = (char **)userdata;
+  size_t new_len = strlen(*buf) + size * nmemb;
+  char *tmp = realloc(*buf, new_len + 1);
+  if (!tmp) return 0;
+  *buf = tmp;
+  memcpy(*buf + new_len - size * nmemb, ptr, size * nmemb);
+  (*buf)[new_len] = '\0';
+  return size * nmemb;
+}
+
+int runner_fetch_url(const char *url, char **content) {
+  CURL *curl;
+  CURLcode res;
+
+  *content = dup_str("");
+  if (!*content) return -1;
+
+  curl = curl_easy_init();
+  if (!curl) return -1;
+
+  curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, content);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+
+  res = curl_easy_perform(curl);
+  curl_easy_cleanup(curl);
+
+  if (res != CURLE_OK) {
+    free(*content);
+    *content = NULL;
+    return -1;
+  }
+  return 0;
 }
