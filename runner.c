@@ -387,6 +387,7 @@ static size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdat
 int runner_fetch_url(const char *url, char **content) {
   CURL *curl;
   CURLcode res;
+  long http_code = 0;
 
   *content = dup_str("");
   if (!*content) return -1;
@@ -401,11 +402,19 @@ int runner_fetch_url(const char *url, char **content) {
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
 
   res = curl_easy_perform(curl);
-  curl_easy_cleanup(curl);
-
   if (res != CURLE_OK) {
     free(*content);
-    *content = NULL;
+    *content = fmt_str("Network error: %s\n", curl_easy_strerror(res));
+    curl_easy_cleanup(curl);
+    return -1;
+  }
+
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+  curl_easy_cleanup(curl);
+
+  if (http_code != 200) {
+    free(*content);
+    *content = fmt_str("HTTP error: %ld\n", http_code);
     return -1;
   }
   return 0;

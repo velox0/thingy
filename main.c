@@ -34,6 +34,11 @@ typedef struct {
 
 static int is_fold_start_row(const FoldList *folds, int row);
 
+static const char *path_basename(const char *path) {
+  const char *base = strrchr(path, '/');
+  return base ? base + 1 : path;
+}
+
 static char *dup_str(const char *s) {
   size_t len = strlen(s);
   char *copy = malloc(len + 1);
@@ -333,7 +338,16 @@ static void run(Editor *ed) {
   if (save_file(ed) != 0) return;
 
   ext = strrchr(ed->filename, '.');
-  snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_run_%d%s", getpid(), ext ? ext : ".c");
+  {
+    const char *base = path_basename(ed->filename);
+    char base_no_ext[256];
+    const char *dot = strrchr(base, '.');
+    int base_len = dot ? (int)(dot - base) : (int)strlen(base);
+    if (base_len > (int)sizeof(base_no_ext) - 1) base_len = (int)sizeof(base_no_ext) - 1;
+    memcpy(base_no_ext, base, (size_t)base_len);
+    base_no_ext[base_len] = '\0';
+    snprintf(tmppath, sizeof(tmppath), "/tmp/%d_%s%s", getpid(), base_no_ext, ext ? ext : ".c");
+  }
   if (buffer_save_file_filtered(&ed->buffer, tmppath, err, sizeof(err)) != 0) {
     set_status(ed, "Run failed: %s", err);
     return;
@@ -628,42 +642,57 @@ int main(int argc, char **argv) {
 
     is_url = (strncmp(path, "http://", 7) == 0 || strncmp(path, "https://", 8) == 0);
 
-    buffer_init(&buf);
-    if (is_url) {
-      char *content = NULL;
-      FILE *fp;
-      if (runner_fetch_url(path, &content) != 0 || !content) {
-        fprintf(stderr, "Error fetching URL: %s\n", path);
-        buffer_free(&buf);
-        return 1;
+    {
+      const char *src_name = is_url ? strrchr(path, '/') : path_basename(path);
+      if (!src_name) src_name = "file";
+      else src_name++;
+      {
+        const char *dot = strrchr(src_name, '.');
+        int name_len = dot ? (int)(dot - src_name) : (int)strlen(src_name);
+        char safe_name[256];
+        if (name_len > (int)sizeof(safe_name) - 1) name_len = (int)sizeof(safe_name) - 1;
+        memcpy(safe_name, src_name, (size_t)name_len);
+        safe_name[name_len] = '\0';
+
+        buffer_init(&buf);
+        if (is_url) {
+          char *content = NULL;
+          FILE *fp;
+          if (runner_fetch_url(path, &content) != 0 || !content) {
+            fprintf(stderr, "%s", content ? content : "Error fetching URL\n");
+            free(content);
+            buffer_free(&buf);
+            return 1;
+          }
+          snprintf(tmppath, sizeof(tmppath), "/tmp/%d_%s.tmp", getpid(), safe_name);
+          fp = fopen(tmppath, "w");
+          if (!fp) {
+            fprintf(stderr, "Error writing temp file: %s\n", strerror(errno));
+            free(content);
+            buffer_free(&buf);
+            return 1;
+          }
+          fputs(content, fp);
+          fclose(fp);
+          free(content);
+          if (buffer_load_file(&buf, tmppath, err, sizeof(err)) != 0) {
+            fprintf(stderr, "Error loading fetched content: %s\n", err);
+            remove(tmppath);
+            buffer_free(&buf);
+            return 1;
+          }
+          remove(tmppath);
+          snprintf(tmppath, sizeof(tmppath), "/tmp/%d_%s.c", getpid(), safe_name);
+        } else {
+          if (buffer_load_file(&buf, path, err, sizeof(err)) != 0) {
+            fprintf(stderr, "Error loading %s: %s\n", path, err);
+            buffer_free(&buf);
+            return 1;
+          }
+          ext = strrchr(path, '.');
+          snprintf(tmppath, sizeof(tmppath), "/tmp/%d_%s%s", getpid(), safe_name, ext ? ext : ".c");
+        }
       }
-      snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_url_%d.tmp", getpid());
-      fp = fopen(tmppath, "w");
-      if (!fp) {
-        fprintf(stderr, "Error writing temp file: %s\n", strerror(errno));
-        free(content);
-        buffer_free(&buf);
-        return 1;
-      }
-      fputs(content, fp);
-      fclose(fp);
-      free(content);
-      if (buffer_load_file(&buf, tmppath, err, sizeof(err)) != 0) {
-        fprintf(stderr, "Error loading fetched content: %s\n", err);
-        remove(tmppath);
-        buffer_free(&buf);
-        return 1;
-      }
-      remove(tmppath);
-      snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_cli_%d.c", getpid());
-    } else {
-      if (buffer_load_file(&buf, path, err, sizeof(err)) != 0) {
-        fprintf(stderr, "Error loading %s: %s\n", path, err);
-        buffer_free(&buf);
-        return 1;
-      }
-      ext = strrchr(path, '.');
-      snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_cli_%d%s", getpid(), ext ? ext : ".c");
     }
 
     if (buffer_save_file_filtered(&buf, tmppath, err, sizeof(err)) != 0) {
