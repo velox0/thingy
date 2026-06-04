@@ -35,10 +35,9 @@ jobs:
 
   build-linux-arm64:
     runs-on: ubuntu-24.04-arm
-    container: alpine:latest
     steps:
       - name: Install dependencies
-        run: apk add --no-cache gcc make musl-dev ncurses-dev curl-dev
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc make libncurses-dev libcurl4-openssl-dev
       - uses: actions/checkout@v4
       - name: Build
         run: make
@@ -108,6 +107,7 @@ jobs:
 
           gh repo clone Velox0/brew /tmp/brew
           cd /tmp/brew
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/Velox0/brew.git"
 
           cat > Formula/thingy.rb <<EOF
           class Thingy < Formula
