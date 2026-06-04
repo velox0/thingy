@@ -6,6 +6,45 @@
 
 #include "editor.h"
 
+#ifndef GIT_VERSION
+#define GIT_VERSION "dev"
+#endif
+
+static void print_usage(void) {
+  printf(
+    "\n"
+    " \xF0\x9F\x8C\xB8 thingy \xE2\x80\x94 Sakura TUI Editor\n"
+    "\n"
+    " Usage: thingy [options] [file]\n"
+    "        thingy --run [options] <file|url>\n"
+    "\n"
+    " Options:\n"
+    "   -h, --help              Show this help and retreat\n"
+    "   -v, --version           Show version and stand down\n"
+    "   --run                   Execute a file without the TUI\n"
+    "   --lang <lang>           Force language (c, python, node, ruby, php, perl, sh)\n"
+    "\n"
+    " Keys: ^S save  ^R run  ^F fold  ^O output  ^L lang  ^Q quit\n"
+    "\n");
+}
+
+static int check_terminal(void) {
+  if (!isatty(STDOUT_FILENO) || !isatty(STDIN_FILENO)) {
+    fprintf(stderr,
+      "\n \xF0\x9F\x8C\xB8 thingy needs a real terminal, soldier.\n"
+      "    Stop piping me into the void. Open a terminal and try again.\n\n");
+    return -1;
+  }
+  const char *term = getenv("TERM");
+  if (!term || !term[0]) {
+    fprintf(stderr,
+      "\n \xF0\x9F\x8C\xB8 TERM is not set, soldier.\n"
+      "    I don't know what battlefield you're on. Set TERM and try again.\n\n");
+    return -1;
+  }
+  return 0;
+}
+
 static int init_editor(Editor *ed, const char *filename) {
   char err[256];
   int is_url;
@@ -141,6 +180,17 @@ int main(int argc, char **argv) {
   Editor ed;
   int i;
 
+  for (i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+      print_usage();
+      return 0;
+    }
+    if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0) {
+      printf("thingy %s\n", GIT_VERSION);
+      return 0;
+    }
+  }
+
   if (argc > 1 && strcmp(argv[1], "--run") == 0) {
     const char *path = NULL;
     const char *lang = NULL;
@@ -160,6 +210,8 @@ int main(int argc, char **argv) {
 
     return run_cli(path, lang);
   }
+
+  if (check_terminal() != 0) return 1;
 
   if (init_editor(&ed, argc > 1 ? argv[1] : "untitled.txt") != 0) {
     fprintf(stderr, "Failed to initialize editor.\n");

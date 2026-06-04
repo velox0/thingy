@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -pedantic -std=c99 -D_POSIX_C_SOURCE=200809L -Isrc
+CFLAGS = -Wall -Wextra -pedantic -std=c99 -D_POSIX_C_SOURCE=200809L -Isrc -DGIT_VERSION=\"$(GIT_VERSION)\"
 LDLIBS = -lncurses -lcurl
 SRCDIR = src
 BUILDDIR = build
@@ -8,6 +8,7 @@ OBJS = $(BUILDDIR)/main.o $(BUILDDIR)/ui.o $(BUILDDIR)/input.o $(BUILDDIR)/buffe
 
 PREFIX ?= /usr/local
 VERSION ?= 1.0.0
+GIT_VERSION := $(shell git describe --tags --always 2>/dev/null || echo "$(VERSION)")
 RELEASEDIR = release
 
 UNAME_S := $(shell uname -s)
