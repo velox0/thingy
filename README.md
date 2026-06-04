@@ -1,6 +1,6 @@
 # 🌸 thingy 🌸
 
-<img src="./header.png" alt="Header" width="280px" align="right" />
+<img src="./docs/header.png" alt="Header" width="280px" align="right" />
 
 Listen up. **thingy** is here, and it's the toughest little blossom you'll ever cross. 👊
 

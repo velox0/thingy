@@ -1,7 +1,10 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -pedantic -std=c99
+CFLAGS = -Wall -Wextra -pedantic -std=c99 -Isrc
 LDLIBS = -lncurses -lcurl
-OBJS = main.o ui.o input.o buffer.o runner.o
+SRCDIR = src
+BUILDDIR = build
+BINDIR = $(BUILDDIR)/bin
+OBJS = $(BUILDDIR)/main.o $(BUILDDIR)/ui.o $(BUILDDIR)/input.o $(BUILDDIR)/buffer.o $(BUILDDIR)/runner.o
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -12,15 +15,24 @@ ifeq ($(UNAME_S),Darwin)
   endif
 endif
 
-all: thingy
+all: $(BINDIR)/thingy
 
-thingy: $(OBJS)
+$(BINDIR)/thingy: $(OBJS) | $(BINDIR)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDLIBS)
 
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
+
+$(BINDIR):
+	mkdir -p $(BINDIR)
+
 clean:
-	rm -f thingy $(OBJS)
+	rm -rf $(BUILDDIR)
 
 format:
-	@astyle --indent=spaces=2 main.c ui.c input.c buffer.c runner.c buffer.h runner.h editor.h
+	@astyle --indent=spaces=2 $(SRCDIR)/*.c $(SRCDIR)/*.h
 
 .PHONY: all clean format
