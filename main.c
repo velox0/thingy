@@ -22,7 +22,10 @@ typedef struct {
   int screen_rows;
   int screen_cols;
   int output_visible;
+  int lang_popup_visible;
+  int lang_selection;
   char *output_text;
+  char current_lang[32];
   char status[256];
   char filename[PATH_MAX];
   int should_quit;
@@ -144,11 +147,60 @@ static const char *tail_start(const char *text, int max_lines) {
   return start;
 }
 
+static const char *lang_names[] = {
+  "auto", "c", "python", "node", "ruby", "php", "perl", "sh"
+};
+#define LANG_COUNT (int)(sizeof(lang_names) / sizeof(lang_names[0]))
+
+static void draw_lang_popup(Editor *ed) {
+  int popup_w = 18;
+  int popup_h = LANG_COUNT + 2;
+  int popup_x = (ed->screen_cols - popup_w) / 2;
+  int popup_y = (ed->screen_rows - popup_h) / 2;
+  int i;
+
+  if (popup_x < 0) popup_x = 0;
+  if (popup_y < 1) popup_y = 1;
+
+  if (has_colors()) attron(COLOR_PAIR(2) | A_BOLD);
+  for (i = 0; i < popup_h; i++) {
+    mvhline(popup_y + i, popup_x, ' ', popup_w);
+  }
+  mvaddnstr(popup_y, popup_x, " Language (Enter)", popup_w);
+  if (has_colors()) attroff(COLOR_PAIR(2) | A_BOLD);
+
+  for (i = 0; i < LANG_COUNT; i++) {
+    int row = popup_y + 1 + i;
+    int selected = (i == ed->lang_selection);
+    int is_current = (strcmp(lang_names[i], ed->current_lang) == 0) ||
+                     (i == 0 && ed->current_lang[0] == '\0');
+
+    if (selected) {
+      if (has_colors()) attron(COLOR_PAIR(1) | A_BOLD);
+      else attron(A_REVERSE);
+    } else if (is_current) {
+      if (has_colors()) attron(COLOR_PAIR(3));
+    }
+
+    mvaddnstr(row, popup_x + 1, lang_names[i], popup_w - 2);
+    if (is_current && !selected) {
+      mvaddch(row, popup_x + popup_w - 2, '*');
+    }
+
+    if (selected) {
+      if (has_colors()) attroff(COLOR_PAIR(1) | A_BOLD);
+      else attroff(A_REVERSE);
+    } else if (is_current) {
+      if (has_colors()) attroff(COLOR_PAIR(3));
+    }
+  }
+}
+
 static void draw_status(Editor *ed) {
   char line[512];
 
   snprintf(line, sizeof(line),
-           "%s  Ln %d, Col %d  |  ^S Save  ^R Run  ^F Fold  ^O Output  ^Q Quit",
+           "%s  Ln %d, Col %d  |  ^S Save  ^R Run  ^L Lang  ^F Fold  ^O Output  ^Q Quit",
            ed->filename, ed->cy + 1, ed->cx + 1);
   if (has_colors()) {
     attron(COLOR_PAIR(2) | A_BOLD);
@@ -286,7 +338,7 @@ static void run(Editor *ed) {
     return;
   }
 
-  result = runner_smart_run(tmppath, &output);
+  result = runner_smart_run(tmppath, ed->current_lang[0] ? ed->current_lang : NULL, &output);
   set_output(ed, output ? output : "");
   free(output);
   remove(tmppath);
@@ -323,6 +375,35 @@ static int is_fold_start_row(const FoldList *folds, int row) {
 static void process_keypress(Editor *ed) {
   int ch = getch();
 
+  if (ed->lang_popup_visible) {
+    switch (ch) {
+      case CTRL_KEY('l'):
+      case 27:
+        ed->lang_popup_visible = 0;
+        return;
+      case KEY_UP:
+        if (ed->lang_selection > 0) ed->lang_selection--;
+        return;
+      case KEY_DOWN:
+        if (ed->lang_selection < LANG_COUNT - 1) ed->lang_selection++;
+        return;
+      case '\n':
+      case '\r':
+      case KEY_ENTER:
+        if (ed->lang_selection == 0) {
+          ed->current_lang[0] = '\0';
+          set_status(ed, "Language: auto");
+        } else {
+          snprintf(ed->current_lang, sizeof(ed->current_lang), "%s", lang_names[ed->lang_selection]);
+          set_status(ed, "Language: %s", ed->current_lang);
+        }
+        ed->lang_popup_visible = 0;
+        return;
+      default:
+        return;
+    }
+  }
+
   switch (ch) {
     case CTRL_KEY('q'):
       ed->should_quit = 1;
@@ -338,6 +419,11 @@ static void process_keypress(Editor *ed) {
 
     case CTRL_KEY('o'):
       ed->output_visible = !ed->output_visible;
+      break;
+
+    case CTRL_KEY('l'):
+      ed->lang_popup_visible = !ed->lang_popup_visible;
+      ed->lang_selection = 0;
       break;
 
     case CTRL_KEY('f'): {
@@ -446,6 +532,7 @@ static void refresh_screen(Editor *ed) {
   draw_status(ed);
   draw_editor_area(ed);
   draw_output(ed);
+  if (ed->lang_popup_visible) draw_lang_popup(ed);
 
   screen_y = 1 + visible_rows_before(&ed->folds, ed->cy) - visible_rows_before(&ed->folds, ed->row_offset);
   if (!is_fold_start_row(&ed->folds, ed->cy)) {
@@ -512,9 +599,11 @@ static void shutdown_editor(Editor *ed) {
 
 int main(int argc, char **argv) {
   Editor ed;
+  int i;
 
   if (argc > 1 && strcmp(argv[1], "--run") == 0) {
-    const char *path = argc > 2 ? argv[2] : NULL;
+    const char *path = NULL;
+    const char *lang = NULL;
     TextBuffer buf;
     char err[256];
     char tmppath[PATH_MAX];
@@ -522,8 +611,16 @@ int main(int argc, char **argv) {
     RunResult result;
     char *output = NULL;
 
+    for (i = 2; i < argc; i++) {
+      if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc) {
+        lang = argv[++i];
+      } else if (!path) {
+        path = argv[i];
+      }
+    }
+
     if (!path) {
-      fprintf(stderr, "Usage: thingy --run <file>\n");
+      fprintf(stderr, "Usage: thingy --run [--lang <lang>] <file>\n");
       return 1;
     }
 
@@ -542,7 +639,7 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-    result = runner_smart_run(tmppath, &output);
+    result = runner_smart_run(tmppath, lang, &output);
     remove(tmppath);
     buffer_free(&buf);
 

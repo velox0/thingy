@@ -201,7 +201,7 @@ static int file_looks_like_c(const char *file_path) {
   return score >= 4;
 }
 
-RunResult runner_smart_run(const char *file_path, char **output) {
+RunResult runner_smart_run(const char *file_path, const char *lang_override, char **output) {
   const char *ext;
   char cwd[PATH_MAX];
   char *q_file = NULL;
@@ -218,7 +218,11 @@ RunResult runner_smart_run(const char *file_path, char **output) {
   }
 
   ext = strrchr(file_path, '.');
-  treat_as_c = (ext && strcmp(ext, ".c") == 0) || file_looks_like_c(file_path);
+  if (lang_override && lang_override[0]) {
+    treat_as_c = (strcmp(lang_override, "c") == 0);
+  } else {
+    treat_as_c = (ext && strcmp(ext, ".c") == 0) || file_looks_like_c(file_path);
+  }
   if (!getcwd(cwd, sizeof(cwd))) {
     *output = fmt_str("Could not get working directory: %s\n", strerror(errno));
     return RUN_INTERNAL_ERROR;
@@ -328,7 +332,23 @@ RunResult runner_smart_run(const char *file_path, char **output) {
   }
 
   {
-    const char *interpreter = interpreter_for_extension(ext);
+    const char *interpreter = NULL;
+    if (lang_override && lang_override[0]) {
+      if (strcmp(lang_override, "python") == 0 || strcmp(lang_override, "py") == 0)
+        interpreter = "python3";
+      else if (strcmp(lang_override, "node") == 0 || strcmp(lang_override, "js") == 0)
+        interpreter = "node";
+      else if (strcmp(lang_override, "ruby") == 0 || strcmp(lang_override, "rb") == 0)
+        interpreter = "ruby";
+      else if (strcmp(lang_override, "php") == 0)
+        interpreter = "php";
+      else if (strcmp(lang_override, "perl") == 0 || strcmp(lang_override, "pl") == 0)
+        interpreter = "perl";
+      else if (strcmp(lang_override, "sh") == 0 || strcmp(lang_override, "bash") == 0)
+        interpreter = "sh";
+    } else {
+      interpreter = interpreter_for_extension(ext);
+    }
     if (interpreter) {
       cmd = fmt_str("cd %s && %s %s 2>&1", q_cwd, interpreter, q_file);
     } else {

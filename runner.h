@@ -8,6 +8,6 @@ typedef enum {
   RUN_INTERNAL_ERROR = 3
 } RunResult;
 
-RunResult runner_smart_run(const char *file_path, char **output);
+RunResult runner_smart_run(const char *file_path, const char *lang_override, char **output);
 
 #endif
