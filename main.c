@@ -504,6 +504,7 @@ static int init_editor(Editor *ed, const char *filename) {
 
 static void shutdown_editor(Editor *ed) {
   endwin();
+  reset_shell_mode();
   free(ed->output_text);
   buffer_free(&ed->buffer);
   folds_free(&ed->folds);
