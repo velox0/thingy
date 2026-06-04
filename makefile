@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -pedantic -std=c99
 LDLIBS = -lncurses -lcurl
-OBJS = main.o buffer.o runner.o
+OBJS = main.o ui.o input.o buffer.o runner.o
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -21,6 +21,6 @@ clean:
 	rm -f thingy $(OBJS)
 
 format:
-	@astyle --indent=spaces=2 main.c buffer.c runner.c buffer.h runner.h
+	@astyle --indent=spaces=2 main.c ui.c input.c buffer.c runner.c buffer.h runner.h editor.h
 
 .PHONY: all clean format
