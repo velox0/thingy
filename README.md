@@ -35,22 +35,42 @@ You think pink is weak? Say that to ncurses' face. thingy is a heavyweight TUI e
     ```
 4.  Execute:
     ```bash
-    ./thingy your_file.c
+    thingy your_file.c
     ```
+
+### Install system-wide
+
+Lock it into position:
+
+```bash
+sudo make install
+```
+
+Defaults to `/usr/local/bin`. Change the drop zone if you need to:
+
+```bash
+make install PREFIX=~/.local
+```
+
+To pull it out:
+
+```bash
+sudo make uninstall
+```
 
 ### Run from CLI (no TUI)
 
 Skip the editor, just run a file or URL directly:
 
 ```bash
-./thingy --run your_file.c
-./thingy --run https://example.com/main.txt
+thingy --run your_file.c
+thingy --run https://example.com/main.txt
 ```
 
 Force a specific language:
 
 ```bash
-./thingy --run --lang python https://example.com/script.txt
+thingy --run --lang python https://example.com/script.txt
 ```
 
 ## 🍬 Battle Stations
@@ -81,7 +101,7 @@ Press `^L` to pick a language (auto, c, python, node, ruby, php, perl, sh). Auto
 thingy can fetch and run code from any URL:
 
 ```bash
-./thingy https://example.com/main.txt
+thingy https://example.com/main.txt
 ```
 
 Or from inside the editor, just `^R` on a URL-opened file. Streams the content live while fetching.

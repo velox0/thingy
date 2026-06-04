@@ -6,6 +6,8 @@ BUILDDIR = build
 BINDIR = $(BUILDDIR)/bin
 OBJS = $(BUILDDIR)/main.o $(BUILDDIR)/ui.o $(BUILDDIR)/input.o $(BUILDDIR)/buffer.o $(BUILDDIR)/runner.o
 
+PREFIX ?= /usr/local
+
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
   HOMEBREW_PREFIX := $(shell brew --prefix ncurses 2>/dev/null)
@@ -29,10 +31,17 @@ $(BUILDDIR):
 $(BINDIR):
 	mkdir -p $(BINDIR)
 
+install: $(BINDIR)/thingy
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install -m 755 $(BINDIR)/thingy $(DESTDIR)$(PREFIX)/bin/thingy
+
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/bin/thingy
+
 clean:
 	rm -rf $(BUILDDIR)
 
 format:
 	@astyle --indent=spaces=2 $(SRCDIR)/*.c $(SRCDIR)/*.h
 
-.PHONY: all clean format
+.PHONY: all install uninstall clean format
