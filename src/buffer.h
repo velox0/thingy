@@ -14,9 +14,9 @@
  * never modify the buffer -- they only affect what the editor displays.
  */
 typedef struct {
-  char **lines;
-  int line_count;
-  int capacity;
+  char** lines;
+  int    line_count;
+  int    capacity;
 } TextBuffer;
 
 /*
@@ -52,60 +52,59 @@ typedef struct {
  * hidden_count: Number of entries in hidden_rows.
  */
 typedef struct {
-  int row;
-  char *label;
-  int *hidden_rows;
-  int hidden_count;
+  int   row;
+  char* label;
+  int*  hidden_rows;
+  int   hidden_count;
 } FoldEntry;
 
 /*
  * FoldList - all active folds.
  */
 typedef struct {
-  FoldEntry *items;
-  int count;
-  int capacity;
+  FoldEntry* items;
+  int        count;
+  int        capacity;
 } FoldList;
 
-void buffer_init(TextBuffer *buf);
-void buffer_free(TextBuffer *buf);
-int ensure_line_capacity(TextBuffer *buf, int needed);
+void buffer_init(TextBuffer* buf);
+void buffer_free(TextBuffer* buf);
+int  ensure_line_capacity(TextBuffer* buf, int needed);
 
-int buffer_load_file(TextBuffer *buf, const char *path, char *err, size_t err_size);
-int buffer_save_file(const TextBuffer *buf, const char *path, char *err, size_t err_size);
+int buffer_load_file(TextBuffer* buf, const char* path, char* err, size_t err_size);
+int buffer_save_file(const TextBuffer* buf, const char* path, char* err, size_t err_size);
 
-int buffer_line_len(const TextBuffer *buf, int row);
-void buffer_clamp_cursor(const TextBuffer *buf, int *row, int *col);
-void buffer_insert_char(TextBuffer *buf, int row, int col, char c);
-int buffer_insert_newline(TextBuffer *buf, int *row, int *col);
-int buffer_backspace(TextBuffer *buf, int *row, int *col);
+int  buffer_line_len(const TextBuffer* buf, int row);
+void buffer_clamp_cursor(const TextBuffer* buf, int* row, int* col);
+void buffer_insert_char(TextBuffer* buf, int row, int col, char c);
+int  buffer_insert_newline(TextBuffer* buf, int* row, int* col);
+int  buffer_backspace(TextBuffer* buf, int* row, int* col);
 
-void folds_init(FoldList *folds);
-void folds_free(FoldList *folds);
+void folds_init(FoldList* folds);
+void folds_free(FoldList* folds);
 
 /* Returns 1 if row is the start marker of a fold (i.e. cursor is on a
    folded block's marker line). */
-int folds_is_folded_row(const FoldList *folds, int row);
+int folds_is_folded_row(const FoldList* folds, int row);
 
 /* Returns 1 if row should be hidden from display. Covers both the marker
    lines and all content lines between them. */
-int folds_is_hidden_row(const FoldList *folds, int row);
+int folds_is_hidden_row(const FoldList* folds, int row);
 
 /* Adjust fold row indices after the buffer gains or loses a line. */
-void folds_on_line_insert(FoldList *folds, int at_row);
-void folds_on_line_delete(FoldList *folds, int at_row);
+void folds_on_line_insert(FoldList* folds, int at_row);
+void folds_on_line_delete(FoldList* folds, int at_row);
 
 /* Toggle fold at cursor_row. If the cursor is on an existing fold's start
    marker, the fold is removed (unfold). Otherwise, scans upward for a
    <<< marker and downward for the matching >>> to create a new fold.
    Writes a status message into msg. Returns 1 on toggle, 0 if no fold
    found, -1 on error. */
-int buffer_toggle_fold(TextBuffer *buf, FoldList *folds, int *cursor_row,
-                       char *msg, size_t msg_size);
+int buffer_toggle_fold(TextBuffer* buf, FoldList* folds, int* cursor_row, char* msg,
+                       size_t msg_size);
 
 /* Save the buffer to disk, stripping all fold marker lines (<<< and >>>).
    Use this for running code so the output compiles cleanly. */
-int buffer_save_file_filtered(const TextBuffer *buf,
-                              const char *path, char *err, size_t err_size);
+int buffer_save_file_filtered(const TextBuffer* buf, const char* path, char* err, size_t err_size);
 
 #endif

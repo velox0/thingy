@@ -12,42 +12,42 @@
 
 static void print_usage(void) {
   printf(
-    "\n"
-    " \xF0\x9F\x8C\xB8 thingy \xE2\x80\x94 Sakura TUI Editor\n"
-    "\n"
-    " Usage: thingy [options] [file]\n"
-    "        thingy --run [options] <file|url>\n"
-    "\n"
-    " Options:\n"
-    "   -h, --help              Show this help and retreat\n"
-    "   -v, --version           Show version and stand down\n"
-    "   --run                   Execute a file without the TUI\n"
-    "   --lang <lang>           Force language (c, python, node, ruby, php, perl, sh)\n"
-    "\n"
-    " Keys: ^S save  ^R run  ^F fold  ^O output  ^L lang  ^Q quit\n"
-    "\n");
+      "\n"
+      " \xF0\x9F\x8C\xB8 thingy \xE2\x80\x94 Sakura TUI Editor\n"
+      "\n"
+      " Usage: thingy [options] [file]\n"
+      "        thingy --run [options] <file|url>\n"
+      "\n"
+      " Options:\n"
+      "   -h, --help              Show this help and retreat\n"
+      "   -v, --version           Show version and stand down\n"
+      "   --run                   Execute a file without the TUI\n"
+      "   --lang <lang>           Force language (c, python, node, ruby, php, perl, sh)\n"
+      "\n"
+      " Keys: ^S save  ^R run  ^F fold  ^O output  ^L lang  ^Q quit\n"
+      "\n");
 }
 
 static int check_terminal(void) {
   if (!isatty(STDOUT_FILENO) || !isatty(STDIN_FILENO)) {
     fprintf(stderr,
-      "\n \xF0\x9F\x8C\xB8 thingy needs a real terminal, soldier.\n"
-      "    Stop piping me into the void. Open a terminal and try again.\n\n");
+            "\n \xF0\x9F\x8C\xB8 thingy needs a real terminal, soldier.\n"
+            "    Stop piping me into the void. Open a terminal and try again.\n\n");
     return -1;
   }
-  const char *term = getenv("TERM");
+  const char* term = getenv("TERM");
   if (!term || !term[0]) {
     fprintf(stderr,
-      "\n \xF0\x9F\x8C\xB8 TERM is not set, soldier.\n"
-      "    I don't know what battlefield you're on. Set TERM and try again.\n\n");
+            "\n \xF0\x9F\x8C\xB8 TERM is not set, soldier.\n"
+            "    I don't know what battlefield you're on. Set TERM and try again.\n\n");
     return -1;
   }
   return 0;
 }
 
-static int init_editor(Editor *ed, const char *filename) {
+static int init_editor(Editor* ed, const char* filename) {
   char err[256];
-  int is_url;
+  int  is_url;
 
   memset(ed, 0, sizeof(*ed));
   buffer_init(&ed->buffer);
@@ -57,7 +57,8 @@ static int init_editor(Editor *ed, const char *filename) {
   snprintf(ed->filename, sizeof(ed->filename), "%s",
            (filename && filename[0]) ? filename : "untitled.txt");
 
-  is_url = filename && (strncmp(filename, "http://", 7) == 0 || strncmp(filename, "https://", 8) == 0);
+  is_url =
+      filename && (strncmp(filename, "http://", 7) == 0 || strncmp(filename, "https://", 8) == 0);
 
   if (is_url) {
     init_ncurses();
@@ -76,7 +77,7 @@ static int init_editor(Editor *ed, const char *filename) {
     }
     if (ed->buffer.line_count <= 0) {
       ensure_line_capacity(&ed->buffer, 1);
-      ed->buffer.lines[0] = dup_str("");
+      ed->buffer.lines[0]   = dup_str("");
       ed->buffer.line_count = 1;
     }
   } else {
@@ -90,7 +91,7 @@ static int init_editor(Editor *ed, const char *filename) {
   return 0;
 }
 
-static void shutdown_editor(Editor *ed) {
+static void shutdown_editor(Editor* ed) {
   endwin();
   reset_shell_mode();
   free(ed->output_text);
@@ -98,30 +99,32 @@ static void shutdown_editor(Editor *ed) {
   folds_free(&ed->folds);
 }
 
-static int run_cli(const char *path, const char *lang) {
-  TextBuffer buf;
-  char err[256];
-  char tmppath[PATH_MAX];
-  const char *ext;
-  RunResult result;
-  char *output = NULL;
-  int is_url = (strncmp(path, "http://", 7) == 0 || strncmp(path, "https://", 8) == 0);
+static int run_cli(const char* path, const char* lang) {
+  TextBuffer  buf;
+  char        err[256];
+  char        tmppath[PATH_MAX];
+  const char* ext;
+  RunResult   result;
+  char*       output = NULL;
+  int         is_url = (strncmp(path, "http://", 7) == 0 || strncmp(path, "https://", 8) == 0);
 
-  const char *src_name = is_url ? strrchr(path, '/') : path_basename(path);
-  if (!src_name) src_name = "file";
-  else src_name++;
+  const char* src_name = is_url ? strrchr(path, '/') : path_basename(path);
+  if (!src_name)
+    src_name = "file";
+  else
+    src_name++;
   {
-    const char *dot = strrchr(src_name, '.');
-    int name_len = dot ? (int)(dot - src_name) : (int)strlen(src_name);
-    char safe_name[256];
+    const char* dot      = strrchr(src_name, '.');
+    int         name_len = dot ? (int)(dot - src_name) : (int)strlen(src_name);
+    char        safe_name[256];
     if (name_len > (int)sizeof(safe_name) - 1) name_len = (int)sizeof(safe_name) - 1;
     memcpy(safe_name, src_name, (size_t)name_len);
     safe_name[name_len] = '\0';
 
     buffer_init(&buf);
     if (is_url) {
-      char *content = NULL;
-      FILE *fp;
+      char* content = NULL;
+      FILE* fp;
       if (runner_fetch_url(path, &content) != 0 || !content) {
         fprintf(stderr, "%s", content ? content : "Error fetching URL\n");
         free(content);
@@ -176,9 +179,9 @@ static int run_cli(const char *path, const char *lang) {
   return result == RUN_OK ? 0 : 1;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   Editor ed;
-  int i;
+  int    i;
 
   for (i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -192,8 +195,8 @@ int main(int argc, char **argv) {
   }
 
   if (argc > 1 && strcmp(argv[1], "--run") == 0) {
-    const char *path = NULL;
-    const char *lang = NULL;
+    const char* path = NULL;
+    const char* lang = NULL;
 
     for (i = 2; i < argc; i++) {
       if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc) {

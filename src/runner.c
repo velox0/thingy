@@ -12,19 +12,19 @@
 #include <unistd.h>
 #include <curl/curl.h>
 
-static char *dup_str(const char *s) {
-  size_t len = strlen(s);
-  char *copy = malloc(len + 1);
+static char* dup_str(const char* s) {
+  size_t len  = strlen(s);
+  char*  copy = malloc(len + 1);
   if (!copy) return NULL;
   memcpy(copy, s, len + 1);
   return copy;
 }
 
-static char *fmt_str(const char *fmt, ...) {
+static char* fmt_str(const char* fmt, ...) {
   va_list ap;
   va_list copy;
-  int needed;
-  char *out;
+  int     needed;
+  char*   out;
 
   va_start(ap, fmt);
   va_copy(copy, ap);
@@ -45,10 +45,10 @@ static char *fmt_str(const char *fmt, ...) {
   return out;
 }
 
-static char *shell_quote(const char *s) {
+static char* shell_quote(const char* s) {
   size_t i;
   size_t len = 2;
-  char *out;
+  char*  out;
   size_t at = 0;
 
   for (i = 0; s[i]; i++) {
@@ -69,12 +69,12 @@ static char *shell_quote(const char *s) {
     }
   }
   out[at++] = '\'';
-  out[at] = '\0';
+  out[at]   = '\0';
   return out;
 }
 
-static int append_chunk(char **dst, size_t *len, size_t *cap, const char *chunk, size_t chunk_len) {
-  char *new_buf;
+static int append_chunk(char** dst, size_t* len, size_t* cap, const char* chunk, size_t chunk_len) {
+  char*  new_buf;
   size_t new_cap;
 
   if (*dst == NULL) {
@@ -83,7 +83,7 @@ static int append_chunk(char **dst, size_t *len, size_t *cap, const char *chunk,
     *dst = malloc(*cap);
     if (!*dst) return -1;
     (*dst)[0] = '\0';
-    *len = 0;
+    *len      = 0;
   } else if (*len + chunk_len + 1 > *cap) {
     new_cap = *cap;
     while (new_cap < *len + chunk_len + 1) new_cap *= 2;
@@ -99,14 +99,14 @@ static int append_chunk(char **dst, size_t *len, size_t *cap, const char *chunk,
   return 0;
 }
 
-static int run_command_capture(const char *command, char **output, int *exit_code) {
-  FILE *pipe;
-  char buf[1024];
+static int run_command_capture(const char* command, char** output, int* exit_code) {
+  FILE*  pipe;
+  char   buf[1024];
   size_t out_len = 0;
   size_t out_cap = 0;
-  int status;
+  int    status;
 
-  *output = NULL;
+  *output    = NULL;
   *exit_code = 1;
 
   pipe = popen(command, "r");
@@ -130,13 +130,13 @@ static int run_command_capture(const char *command, char **output, int *exit_cod
   return *output ? 0 : -1;
 }
 
-static char *binary_name_from_path(const char *path) {
-  const char *base = strrchr(path, '/');
-  const char *name = base ? base + 1 : path;
-  const char *dot = strrchr(name, '.');
-  size_t raw_len = dot ? (size_t)(dot - name) : strlen(name);
-  size_t i;
-  char *out;
+static char* binary_name_from_path(const char* path) {
+  const char* base    = strrchr(path, '/');
+  const char* name    = base ? base + 1 : path;
+  const char* dot     = strrchr(name, '.');
+  size_t      raw_len = dot ? (size_t)(dot - name) : strlen(name);
+  size_t      i;
+  char*       out;
 
   if (raw_len == 0) raw_len = strlen(name);
   if (raw_len == 0) return dup_str("thingy_run");
@@ -155,7 +155,7 @@ static char *binary_name_from_path(const char *path) {
   return out;
 }
 
-static const char *interpreter_for_extension(const char *ext) {
+static const char* interpreter_for_extension(const char* ext) {
   if (!ext) return NULL;
   if (strcmp(ext, ".py") == 0) return "python3";
   if (strcmp(ext, ".sh") == 0) return "sh";
@@ -166,29 +166,29 @@ static const char *interpreter_for_extension(const char *ext) {
   return NULL;
 }
 
-static char *combine_output(const char *a, const char *b) {
+static char* combine_output(const char* a, const char* b) {
   if ((!a || a[0] == '\0') && (!b || b[0] == '\0')) return dup_str("(no output)\n");
   if (!a || a[0] == '\0') return dup_str(b);
   if (!b || b[0] == '\0') return dup_str(a);
   return fmt_str("%s%s", a, b);
 }
 
-static const char *skip_ws(const char *s) {
+static const char* skip_ws(const char* s) {
   while (*s && isspace((unsigned char)*s)) s++;
   return s;
 }
 
-static int file_looks_like_c(const char *file_path) {
-  FILE *fp;
-  char line[1024];
-  int score = 0;
-  int scanned = 0;
+static int file_looks_like_c(const char* file_path) {
+  FILE* fp;
+  char  line[1024];
+  int   score   = 0;
+  int   scanned = 0;
 
   fp = fopen(file_path, "r");
   if (!fp) return 0;
 
   while (fgets(line, sizeof(line), fp) != NULL) {
-    const char *p = skip_ws(line);
+    const char* p = skip_ws(line);
     scanned++;
     if (strncmp(p, "#include <", 10) == 0 || strncmp(p, "#include \"", 10) == 0) score += 2;
     if (strstr(p, "int main(") || strstr(p, "void main(")) score += 3;
@@ -202,15 +202,15 @@ static int file_looks_like_c(const char *file_path) {
   return score >= 4;
 }
 
-RunResult runner_smart_run(const char *file_path, const char *lang_override, char **output) {
-  const char *ext;
-  char cwd[PATH_MAX];
-  char *q_file = NULL;
-  char *q_cwd = NULL;
-  char *cmd = NULL;
-  char *run_out = NULL;
-  int treat_as_c = 0;
-  int run_code = 1;
+RunResult runner_smart_run(const char* file_path, const char* lang_override, char** output) {
+  const char* ext;
+  char        cwd[PATH_MAX];
+  char*       q_file     = NULL;
+  char*       q_cwd      = NULL;
+  char*       cmd        = NULL;
+  char*       run_out    = NULL;
+  int         treat_as_c = 0;
+  int         run_code   = 1;
 
   *output = NULL;
   if (!file_path || file_path[0] == '\0') {
@@ -230,7 +230,7 @@ RunResult runner_smart_run(const char *file_path, const char *lang_override, cha
   }
 
   q_file = shell_quote(file_path);
-  q_cwd = shell_quote(cwd);
+  q_cwd  = shell_quote(cwd);
   if (!q_file || !q_cwd) {
     free(q_file);
     free(q_cwd);
@@ -239,12 +239,12 @@ RunResult runner_smart_run(const char *file_path, const char *lang_override, cha
   }
 
   if (treat_as_c) {
-    char *binary_name = NULL;
-    char *binary_path = NULL;
-    char *q_binary = NULL;
-    char *compile_cmd = NULL;
-    char *compile_out = NULL;
-    int compile_code = 1;
+    char*     binary_name  = NULL;
+    char*     binary_path  = NULL;
+    char*     q_binary     = NULL;
+    char*     compile_cmd  = NULL;
+    char*     compile_out  = NULL;
+    int       compile_code = 1;
     RunResult result;
 
     if (mkdir("/tmp/thingy_bin", 0755) != 0 && errno != EEXIST) {
@@ -263,7 +263,7 @@ RunResult runner_smart_run(const char *file_path, const char *lang_override, cha
     }
 
     binary_path = fmt_str("/tmp/thingy_bin/%s", binary_name);
-    q_binary = shell_quote(binary_path);
+    q_binary    = shell_quote(binary_path);
     if (ext && strcmp(ext, ".c") == 0) {
       compile_cmd = fmt_str("gcc %s -o %s 2>&1", q_file, q_binary);
     } else {
@@ -318,7 +318,7 @@ RunResult runner_smart_run(const char *file_path, const char *lang_override, cha
     }
 
     *output = combine_output(compile_out, run_out);
-    result = (run_code == 0) ? RUN_OK : RUN_EXEC_ERROR;
+    result  = (run_code == 0) ? RUN_OK : RUN_EXEC_ERROR;
 
     free(binary_name);
     free(binary_path);
@@ -333,7 +333,7 @@ RunResult runner_smart_run(const char *file_path, const char *lang_override, cha
   }
 
   {
-    const char *interpreter = NULL;
+    const char* interpreter = NULL;
     if (lang_override && lang_override[0]) {
       if (strcmp(lang_override, "python") == 0 || strcmp(lang_override, "py") == 0)
         interpreter = "python3";
@@ -373,10 +373,10 @@ RunResult runner_smart_run(const char *file_path, const char *lang_override, cha
   return (run_code == 0) ? RUN_OK : RUN_EXEC_ERROR;
 }
 
-static size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata) {
-  char **buf = (char **)userdata;
+static size_t write_callback(void* ptr, size_t size, size_t nmemb, void* userdata) {
+  char** buf     = (char**)userdata;
   size_t new_len = strlen(*buf) + size * nmemb;
-  char *tmp = realloc(*buf, new_len + 1);
+  char*  tmp     = realloc(*buf, new_len + 1);
   if (!tmp) return 0;
   *buf = tmp;
   memcpy(*buf + new_len - size * nmemb, ptr, size * nmemb);
@@ -384,10 +384,10 @@ static size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdat
   return size * nmemb;
 }
 
-int runner_fetch_url(const char *url, char **content) {
-  CURL *curl;
+int runner_fetch_url(const char* url, char** content) {
+  CURL*    curl;
   CURLcode res;
-  long http_code = 0;
+  long     http_code = 0;
 
   *content = dup_str("");
   if (!*content) return -1;
@@ -421,21 +421,21 @@ int runner_fetch_url(const char *url, char **content) {
 }
 
 typedef struct {
-  TextBuffer *buf;
-  char *partial;
-  void (*on_progress)(void *ctx);
-  void *progress_ctx;
+  TextBuffer* buf;
+  char*       partial;
+  void (*on_progress)(void* ctx);
+  void* progress_ctx;
 } StreamCtx;
 
-static size_t stream_write_callback(void *ptr, size_t size, size_t nmemb, void *userdata) {
-  StreamCtx *ctx = (StreamCtx *)userdata;
-  size_t chunk_len = size * nmemb;
-  char *combined;
-  size_t combined_len;
-  char *nl;
+static size_t stream_write_callback(void* ptr, size_t size, size_t nmemb, void* userdata) {
+  StreamCtx* ctx       = (StreamCtx*)userdata;
+  size_t     chunk_len = size * nmemb;
+  char*      combined;
+  size_t     combined_len;
+  char*      nl;
 
   combined_len = strlen(ctx->partial) + chunk_len;
-  combined = malloc(combined_len + 1);
+  combined     = malloc(combined_len + 1);
   if (!combined) return 0;
   memcpy(combined, ctx->partial, strlen(ctx->partial));
   memcpy(combined + strlen(ctx->partial), ptr, chunk_len);
@@ -445,7 +445,7 @@ static size_t stream_write_callback(void *ptr, size_t size, size_t nmemb, void *
 
   while ((nl = strchr(ctx->partial, '\n')) != NULL) {
     size_t line_len = (size_t)(nl - ctx->partial);
-    char *line = malloc(line_len + 1);
+    char*  line     = malloc(line_len + 1);
     if (line) {
       memcpy(line, ctx->partial, line_len);
       line[line_len] = '\0';
@@ -453,7 +453,7 @@ static size_t stream_write_callback(void *ptr, size_t size, size_t nmemb, void *
       ctx->buf->lines[ctx->buf->line_count++] = line;
     }
     {
-      char *rest = dup_str(nl + 1);
+      char* rest = dup_str(nl + 1);
       free(ctx->partial);
       ctx->partial = rest;
     }
@@ -462,17 +462,18 @@ static size_t stream_write_callback(void *ptr, size_t size, size_t nmemb, void *
   return chunk_len;
 }
 
-int runner_fetch_url_stream(const char *url, TextBuffer *buf, void (*on_progress)(void *progress_ctx), void *progress_ctx) {
-  CURLM *multi;
-  CURL *curl;
-  int running = 0;
-  long http_code = 0;
+int runner_fetch_url_stream(const char* url, TextBuffer*                   buf,
+                            void (*on_progress)(void* progress_ctx), void* progress_ctx) {
+  CURLM*    multi;
+  CURL*     curl;
+  int       running   = 0;
+  long      http_code = 0;
   StreamCtx ctx;
-  CURLMsg *msg;
+  CURLMsg*  msg;
 
-  ctx.buf = buf;
-  ctx.partial = dup_str("");
-  ctx.on_progress = on_progress;
+  ctx.buf          = buf;
+  ctx.partial      = dup_str("");
+  ctx.on_progress  = on_progress;
   ctx.progress_ctx = progress_ctx;
 
   curl = curl_easy_init();
