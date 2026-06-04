@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "buffer.h"
 #include "runner.h"
@@ -26,6 +27,8 @@ typedef struct {
   char filename[PATH_MAX];
   int should_quit;
 } Editor;
+
+static int is_fold_start_row(const FoldList *folds, int row);
 
 static char *dup_str(const char *s) {
   size_t len = strlen(s);
@@ -51,6 +54,14 @@ static void set_output(Editor *ed, const char *text) {
 
 static void clamp_cursor(Editor *ed) {
   buffer_clamp_cursor(&ed->buffer, &ed->cy, &ed->cx);
+  while (ed->cy < ed->buffer.line_count - 1 &&
+         folds_is_hidden_row(&ed->folds, ed->cy) &&
+         !is_fold_start_row(&ed->folds, ed->cy))
+    ed->cy++;
+  while (ed->cy > 0 &&
+         folds_is_hidden_row(&ed->folds, ed->cy) &&
+         !is_fold_start_row(&ed->folds, ed->cy))
+    ed->cy--;
 }
 
 static int output_height(const Editor *ed) {
@@ -64,11 +75,43 @@ static int text_rows(const Editor *ed) {
   return rows > 0 ? rows : 1;
 }
 
+static int visible_rows_before(const FoldList *folds, int row) {
+  int i, count = 0;
+  for (i = 0; i < row; i++) {
+    if (!folds_is_hidden_row(folds, i)) count++;
+  }
+  return count;
+}
+
 static void scroll_editor(Editor *ed) {
   int rows = text_rows(ed);
+  int cursor_screen_y = visible_rows_before(&ed->folds, ed->cy);
+  int offset_screen_y = visible_rows_before(&ed->folds, ed->row_offset);
+  int f;
 
-  if (ed->cy < ed->row_offset) ed->row_offset = ed->cy;
-  if (ed->cy >= ed->row_offset + rows) ed->row_offset = ed->cy - rows + 1;
+  if (!is_fold_start_row(&ed->folds, ed->cy)) {
+    for (f = 0; f < ed->folds.count; f++) {
+      int fr = ed->folds.items[f].row;
+      if (fr > ed->row_offset && fr < ed->cy) cursor_screen_y++;
+    }
+  }
+  for (f = 0; f < ed->folds.count; f++) {
+    int fr = ed->folds.items[f].row;
+    if (fr < ed->row_offset) offset_screen_y++;
+  }
+
+  if (cursor_screen_y < offset_screen_y) {
+    ed->row_offset = ed->cy;
+  }
+  if (cursor_screen_y >= offset_screen_y + rows) {
+    int target = ed->cy;
+    int needed = rows - 1;
+    while (target > 0 && needed > 0) {
+      target--;
+      if (!folds_is_hidden_row(&ed->folds, target) || is_fold_start_row(&ed->folds, target)) needed--;
+    }
+    ed->row_offset = target;
+  }
 
   if (ed->cx < ed->col_offset) ed->col_offset = ed->cx;
   if (ed->cx >= ed->col_offset + ed->screen_cols) {
@@ -123,32 +166,51 @@ static void draw_status(Editor *ed) {
 
 static void draw_editor_area(Editor *ed) {
   int rows = text_rows(ed);
-  int y;
+  int screen_y = 1;
+  int file_row = ed->row_offset;
+  int drawn = 0;
 
   if (has_colors()) {
     attron(COLOR_PAIR(1));
   }
-  for (y = 0; y < rows; y++) {
-    int file_row = ed->row_offset + y;
-    int screen_y = y + 1;
-
-    move(screen_y, 0);
-    clrtoeol();
-
+  while (drawn < rows && screen_y < ed->screen_rows) {
     if (file_row >= ed->buffer.line_count) {
+      move(screen_y, 0);
+      clrtoeol();
       if (has_colors()) attron(COLOR_PAIR(4));
       mvaddch(screen_y, 0, '~');
       if (has_colors()) attroff(COLOR_PAIR(4));
+      screen_y++;
+      drawn++;
       continue;
     }
 
-    {
+    if (is_fold_start_row(&ed->folds, file_row)) {
+      const char *line = ed->buffer.lines[file_row];
+      char folded[512];
+      snprintf(folded, sizeof(folded), "%s >>>", line);
+      move(screen_y, 0);
+      clrtoeol();
+      if (has_colors()) attron(COLOR_PAIR(4));
+      mvaddnstr(screen_y, 0, folded + ed->col_offset, ed->screen_cols);
+      if (has_colors()) attroff(COLOR_PAIR(4));
+      file_row++;
+      while (file_row < ed->buffer.line_count &&
+             folds_is_hidden_row(&ed->folds, file_row)) {
+        file_row++;
+      }
+    } else {
       const char *line = ed->buffer.lines[file_row];
       int len = (int)strlen(line);
+      move(screen_y, 0);
+      clrtoeol();
       if (len > ed->col_offset) {
         mvaddnstr(screen_y, 0, line + ed->col_offset, ed->screen_cols);
       }
+      file_row++;
     }
+    screen_y++;
+    drawn++;
   }
   if (has_colors()) {
     attroff(COLOR_PAIR(1));
@@ -208,15 +270,24 @@ static int save_file(Editor *ed) {
   return 0;
 }
 
-static void run_smart(Editor *ed) {
+static void run(Editor *ed) {
   RunResult result;
   char *output = NULL;
+  char err[256];
+  char tmppath[PATH_MAX];
 
   if (save_file(ed) != 0) return;
 
-  result = runner_smart_run(ed->filename, &output);
+  snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_run_%d.c", getpid());
+  if (buffer_save_file_filtered(&ed->buffer, tmppath, err, sizeof(err)) != 0) {
+    set_status(ed, "Run failed: %s", err);
+    return;
+  }
+
+  result = runner_smart_run(tmppath, &output);
   set_output(ed, output ? output : "");
   free(output);
+  remove(tmppath);
   ed->output_visible = 1;
 
   switch (result) {
@@ -239,6 +310,14 @@ static int cursor_on_folded_row(Editor *ed) {
   return folds_is_folded_row(&ed->folds, ed->cy);
 }
 
+static int is_fold_start_row(const FoldList *folds, int row) {
+  int i;
+  for (i = 0; i < folds->count; i++) {
+    if (folds->items[i].row == row) return 1;
+  }
+  return 0;
+}
+
 static void process_keypress(Editor *ed) {
   int ch = getch();
 
@@ -252,7 +331,7 @@ static void process_keypress(Editor *ed) {
       break;
 
     case CTRL_KEY('r'):
-      run_smart(ed);
+      run(ed);
       break;
 
     case CTRL_KEY('o'):
@@ -268,11 +347,23 @@ static void process_keypress(Editor *ed) {
     }
 
     case KEY_UP:
-      if (ed->cy > 0) ed->cy--;
+      if (ed->cy > 0) {
+        ed->cy--;
+        while (ed->cy > 0 &&
+               folds_is_hidden_row(&ed->folds, ed->cy) &&
+               !is_fold_start_row(&ed->folds, ed->cy))
+          ed->cy--;
+      }
       break;
 
     case KEY_DOWN:
-      if (ed->cy + 1 < ed->buffer.line_count) ed->cy++;
+      if (ed->cy + 1 < ed->buffer.line_count) {
+        ed->cy++;
+        while (ed->cy + 1 < ed->buffer.line_count &&
+               folds_is_hidden_row(&ed->folds, ed->cy) &&
+               !is_fold_start_row(&ed->folds, ed->cy))
+          ed->cy++;
+      }
       break;
 
     case KEY_LEFT:
@@ -280,6 +371,10 @@ static void process_keypress(Editor *ed) {
         ed->cx--;
       } else if (ed->cy > 0) {
         ed->cy--;
+        while (ed->cy > 0 &&
+               folds_is_hidden_row(&ed->folds, ed->cy) &&
+               !is_fold_start_row(&ed->folds, ed->cy))
+          ed->cy--;
         ed->cx = buffer_line_len(&ed->buffer, ed->cy);
       }
       break;
@@ -289,6 +384,10 @@ static void process_keypress(Editor *ed) {
         ed->cx++;
       } else if (ed->cy + 1 < ed->buffer.line_count) {
         ed->cy++;
+        while (ed->cy + 1 < ed->buffer.line_count &&
+               folds_is_hidden_row(&ed->folds, ed->cy) &&
+               !is_fold_start_row(&ed->folds, ed->cy))
+          ed->cy++;
         ed->cx = 0;
       }
       break;
@@ -346,7 +445,14 @@ static void refresh_screen(Editor *ed) {
   draw_editor_area(ed);
   draw_output(ed);
 
-  screen_y = 1 + (ed->cy - ed->row_offset);
+  screen_y = 1 + visible_rows_before(&ed->folds, ed->cy) - visible_rows_before(&ed->folds, ed->row_offset);
+  if (!is_fold_start_row(&ed->folds, ed->cy)) {
+    int f;
+    for (f = 0; f < ed->folds.count; f++) {
+      int fr = ed->folds.items[f].row;
+      if (fr > ed->row_offset && fr < ed->cy) screen_y++;
+    }
+  }
   screen_x = ed->cx - ed->col_offset;
   if (screen_y < 1 || screen_y >= ed->screen_rows || screen_x < 0 || screen_x >= ed->screen_cols) {
     screen_y = 1;

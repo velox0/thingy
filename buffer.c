@@ -299,18 +299,14 @@ void folds_init(FoldList *folds) {
   folds->capacity = 0;
 }
 
-static void free_fold_entry(FoldEntry *entry, int free_hidden_lines) {
-  int i;
+static void free_fold_entry(FoldEntry *entry) {
   free(entry->label);
-  if (free_hidden_lines) {
-    for (i = 0; i < entry->hidden_count; i++) free(entry->hidden_lines[i]);
-  }
-  free(entry->hidden_lines);
+  free(entry->hidden_rows);
 }
 
 void folds_free(FoldList *folds) {
   int i;
-  for (i = 0; i < folds->count; i++) free_fold_entry(&folds->items[i], 1);
+  for (i = 0; i < folds->count; i++) free_fold_entry(&folds->items[i]);
   free(folds->items);
   folds->items = NULL;
   folds->count = 0;
@@ -343,6 +339,16 @@ int folds_is_folded_row(const FoldList *folds, int row) {
   return find_fold_index(folds, row) >= 0;
 }
 
+int folds_is_hidden_row(const FoldList *folds, int row) {
+  int i, j;
+  for (i = 0; i < folds->count; i++) {
+    for (j = 0; j < folds->items[i].hidden_count; j++) {
+      if (folds->items[i].hidden_rows[j] == row) return 1;
+    }
+  }
+  return 0;
+}
+
 void folds_on_line_insert(FoldList *folds, int at_row) {
   int i;
   for (i = 0; i < folds->count; i++) {
@@ -354,7 +360,7 @@ void folds_on_line_delete(FoldList *folds, int at_row) {
   int i;
   for (i = 0; i < folds->count;) {
     if (folds->items[i].row == at_row) {
-      free_fold_entry(&folds->items[i], 1);
+      free_fold_entry(&folds->items[i]);
       memmove(&folds->items[i], &folds->items[i + 1], (size_t)(folds->count - i - 1) * sizeof(FoldEntry));
       folds->count--;
       continue;
@@ -393,10 +399,12 @@ static char *extract_label(const char *line) {
 }
 
 static int intersects_existing_fold(const FoldList *folds, int start, int end) {
-  int i;
+  int i, j;
   for (i = 0; i < folds->count; i++) {
-    int row = folds->items[i].row;
-    if (row >= start && row <= end) return 1;
+    for (j = 0; j < folds->items[i].hidden_count; j++) {
+      int hr = folds->items[i].hidden_rows[j];
+      if (hr >= start && hr <= end) return 1;
+    }
   }
   return 0;
 }
@@ -405,34 +413,11 @@ int buffer_toggle_fold(TextBuffer *buf, FoldList *folds, int *cursor_row, char *
   int fold_idx = find_fold_index(folds, *cursor_row);
 
   if (fold_idx >= 0) {
-    FoldEntry entry = folds->items[fold_idx];
-    int row = entry.row;
-    int extra = entry.hidden_count - 1;
-    int i;
-
-    if (ensure_line_capacity(buf, buf->line_count + extra) != 0) {
-      snprintf(msg, msg_size, "Out of memory while unfolding.");
-      return -1;
-    }
-
-    free(buf->lines[row]);
-    memmove(&buf->lines[row + entry.hidden_count], &buf->lines[row + 1],
-            (size_t)(buf->line_count - row - 1) * sizeof(char *));
-    for (i = 0; i < entry.hidden_count; i++) {
-      buf->lines[row + i] = entry.hidden_lines[i];
-    }
-    buf->line_count += extra;
-
-    for (i = 0; i < folds->count; i++) {
-      if (i != fold_idx && folds->items[i].row > row) folds->items[i].row += extra;
-    }
-
-    free(entry.label);
-    free(entry.hidden_lines);
+    int row = folds->items[fold_idx].row;
+    free_fold_entry(&folds->items[fold_idx]);
     memmove(&folds->items[fold_idx], &folds->items[fold_idx + 1],
             (size_t)(folds->count - fold_idx - 1) * sizeof(FoldEntry));
     folds->count--;
-
     *cursor_row = row;
     snprintf(msg, msg_size, "Unfolded block.");
     return 1;
@@ -444,10 +429,8 @@ int buffer_toggle_fold(TextBuffer *buf, FoldList *folds, int *cursor_row, char *
     int end = -1;
     int i;
     int hidden_count;
-    int removed;
     FoldEntry entry;
     char *label;
-    char *collapsed;
 
     for (i = row; i >= 0; i--) {
       if (is_start_marker_line(buf->lines[i])) {
@@ -482,51 +465,65 @@ int buffer_toggle_fold(TextBuffer *buf, FoldList *folds, int *cursor_row, char *
       return -1;
     }
 
-    {
-      size_t needed = strlen(label) + 9;
-      collapsed = malloc(needed);
-      if (!collapsed) {
-        free(label);
-        snprintf(msg, msg_size, "Out of memory while folding.");
-        return -1;
-      }
-      snprintf(collapsed, needed, "<<< %s >>>", label);
-    }
-
     hidden_count = end - start + 1;
-    entry.hidden_lines = malloc((size_t)hidden_count * sizeof(char *));
-    if (!entry.hidden_lines) {
+    entry.hidden_rows = malloc((size_t)hidden_count * sizeof(int));
+    if (!entry.hidden_rows) {
       free(label);
-      free(collapsed);
       snprintf(msg, msg_size, "Out of memory while folding.");
       return -1;
     }
 
     if (ensure_fold_capacity(folds, folds->count + 1) != 0) {
-      free(entry.hidden_lines);
+      free(entry.hidden_rows);
       free(label);
-      free(collapsed);
       snprintf(msg, msg_size, "Out of memory while folding.");
       return -1;
     }
 
-    for (i = 0; i < hidden_count; i++) entry.hidden_lines[i] = buf->lines[start + i];
+    for (i = 0; i < hidden_count; i++) entry.hidden_rows[i] = start + i;
     entry.row = start;
     entry.label = label;
     entry.hidden_count = hidden_count;
 
-    buf->lines[start] = collapsed;
-    memmove(&buf->lines[start + 1], &buf->lines[end + 1], (size_t)(buf->line_count - end - 1) * sizeof(char *));
-    removed = hidden_count - 1;
-    buf->line_count -= removed;
-
-    for (i = 0; i < folds->count; i++) {
-      if (folds->items[i].row > end) folds->items[i].row -= removed;
-    }
     folds->items[folds->count++] = entry;
 
     *cursor_row = start;
     snprintf(msg, msg_size, "Folded block: %s", label);
     return 1;
   }
+}
+
+int buffer_save_file_filtered(const TextBuffer *buf, const char *path, char *err, size_t err_size) {
+  FILE *fp;
+  int i;
+  int first = 1;
+
+  fp = fopen(path, "w");
+  if (!fp) {
+    snprintf(err, err_size, "%s", strerror(errno));
+    return -1;
+  }
+
+  for (i = 0; i < buf->line_count; i++) {
+    if (is_start_marker_line(buf->lines[i])) continue;
+    if (is_end_marker_line(buf->lines[i])) continue;
+
+    if (!first && fputc('\n', fp) == EOF) {
+      snprintf(err, err_size, "%s", strerror(errno));
+      fclose(fp);
+      return -1;
+    }
+    if (fputs(buf->lines[i], fp) == EOF) {
+      snprintf(err, err_size, "%s", strerror(errno));
+      fclose(fp);
+      return -1;
+    }
+    first = 0;
+  }
+
+  if (fclose(fp) != 0) {
+    snprintf(err, err_size, "%s", strerror(errno));
+    return -1;
+  }
+  return 0;
 }
