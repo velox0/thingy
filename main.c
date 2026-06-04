@@ -275,10 +275,12 @@ static void run(Editor *ed) {
   char *output = NULL;
   char err[256];
   char tmppath[PATH_MAX];
+  const char *ext;
 
   if (save_file(ed) != 0) return;
 
-  snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_run_%d.c", getpid());
+  ext = strrchr(ed->filename, '.');
+  snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_run_%d%s", getpid(), ext ? ext : ".c");
   if (buffer_save_file_filtered(&ed->buffer, tmppath, err, sizeof(err)) != 0) {
     set_status(ed, "Run failed: %s", err);
     return;
@@ -509,6 +511,47 @@ static void shutdown_editor(Editor *ed) {
 
 int main(int argc, char **argv) {
   Editor ed;
+
+  if (argc > 1 && strcmp(argv[1], "--run") == 0) {
+    const char *path = argc > 2 ? argv[2] : NULL;
+    TextBuffer buf;
+    char err[256];
+    char tmppath[PATH_MAX];
+    const char *ext;
+    RunResult result;
+    char *output = NULL;
+
+    if (!path) {
+      fprintf(stderr, "Usage: thingy --run <file>\n");
+      return 1;
+    }
+
+    buffer_init(&buf);
+    if (buffer_load_file(&buf, path, err, sizeof(err)) != 0) {
+      fprintf(stderr, "Error loading %s: %s\n", path, err);
+      buffer_free(&buf);
+      return 1;
+    }
+
+    ext = strrchr(path, '.');
+    snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_cli_%d%s", getpid(), ext ? ext : ".c");
+    if (buffer_save_file_filtered(&buf, tmppath, err, sizeof(err)) != 0) {
+      fprintf(stderr, "Error preparing file: %s\n", err);
+      buffer_free(&buf);
+      return 1;
+    }
+
+    result = runner_smart_run(tmppath, &output);
+    remove(tmppath);
+    buffer_free(&buf);
+
+    if (output && output[0]) {
+      printf("%s", output);
+    }
+    free(output);
+
+    return result == RUN_OK ? 0 : 1;
+  }
 
   if (init_editor(&ed, argc > 1 ? argv[1] : "untitled.txt") != 0) {
     fprintf(stderr, "Failed to initialize editor.\n");
