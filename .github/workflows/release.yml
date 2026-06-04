@@ -99,15 +99,19 @@ jobs:
     steps:
       - name: Update homebrew formula
         env:
-          GH_TOKEN: ${{ secrets.BREW_TOKEN }}
+          DEPLOY_KEY: ${{ secrets.BREW_DEPLOY_KEY }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           TARBALL_URL="https://github.com/${{ github.repository }}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
           SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | awk '{print $1}')
 
-          gh repo clone Velox0/brew /tmp/brew
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          git config --global core.sshCommand "ssh -i ~/.ssh/deploy_key"
+
+          git clone git@github.com:Velox0/brew.git /tmp/brew
           cd /tmp/brew
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/Velox0/brew.git"
 
           cat > Formula/thingy.rb <<EOF
           class Thingy < Formula
@@ -121,7 +125,7 @@ jobs:
             depends_on "curl"
 
             def install
-              system "make"
+              system "make", "VERSION=#{version}"
               bin.install "build/bin/thingy"
             end
 

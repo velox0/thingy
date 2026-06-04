@@ -9,7 +9,7 @@ class Thingy < Formula
   depends_on "curl"
 
   def install
-    system "make"
+    system "make", "VERSION=#{version}"
     bin.install "build/bin/thingy"
   end
 
