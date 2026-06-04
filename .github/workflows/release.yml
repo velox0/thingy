@@ -28,7 +28,6 @@ jobs:
           install -m 755 build/bin/thingy "$pkgdir/thingy"
           echo "thingy ${VERSION}" > "$pkgdir/VERSION"
           cd release && tar -czf "thingy-${VERSION}-linux-amd64.tar.gz" "thingy-${VERSION}-linux-amd64"
-          echo "ASSET=thingy-${VERSION}-linux-amd64.tar.gz" >> "$GITHUB_ENV"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -53,14 +52,13 @@ jobs:
           install -m 755 build/bin/thingy "$pkgdir/thingy"
           echo "thingy ${VERSION}" > "$pkgdir/VERSION"
           cd release && tar -czf "thingy-${VERSION}-linux-arm64.tar.gz" "thingy-${VERSION}-linux-arm64"
-          echo "ASSET=thingy-${VERSION}-linux-arm64.tar.gz" >> "$GITHUB_ENV"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: thingy-linux-arm64
           path: release/*.tar.gz
 
-  build-macos-arm64:
+  build-macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -76,38 +74,14 @@ jobs:
           install -m 755 build/bin/thingy "$pkgdir/thingy"
           echo "thingy ${VERSION}" > "$pkgdir/VERSION"
           cd release && tar -czf "thingy-${VERSION}-macos-arm64.tar.gz" "thingy-${VERSION}-macos-arm64"
-          echo "ASSET=thingy-${VERSION}-macos-arm64.tar.gz" >> "$GITHUB_ENV"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: thingy-macos-arm64
           path: release/*.tar.gz
 
-  build-macos-amd64:
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: brew install ncurses curl
-      - name: Build
-        run: make
-      - name: Package
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          pkgdir="release/thingy-${VERSION}-macos-amd64"
-          mkdir -p "$pkgdir"
-          install -m 755 build/bin/thingy "$pkgdir/thingy"
-          echo "thingy ${VERSION}" > "$pkgdir/VERSION"
-          cd release && tar -czf "thingy-${VERSION}-macos-amd64.tar.gz" "thingy-${VERSION}-macos-amd64"
-          echo "ASSET=thingy-${VERSION}-macos-amd64.tar.gz" >> "$GITHUB_ENV"
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: thingy-macos-amd64
-          path: release/*.tar.gz
-
   release:
-    needs: [build-linux-amd64, build-linux-arm64, build-macos-arm64, build-macos-amd64]
+    needs: [build-linux-amd64, build-linux-arm64, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
