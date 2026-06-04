@@ -12,12 +12,11 @@ permissions:
 jobs:
   build-linux-amd64:
     runs-on: ubuntu-latest
+    container: alpine:latest
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gcc make libncurses-dev libcurl4-openssl-dev
+        run: apk add --no-cache gcc make musl-dev ncurses-dev curl-dev
+      - uses: actions/checkout@v4
       - name: Build
         run: make
       - name: Package
@@ -36,12 +35,11 @@ jobs:
 
   build-linux-arm64:
     runs-on: ubuntu-24.04-arm
+    container: alpine:latest
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gcc make libncurses-dev libcurl4-openssl-dev
+        run: apk add --no-cache gcc make musl-dev ncurses-dev curl-dev
+      - uses: actions/checkout@v4
       - name: Build
         run: make
       - name: Package
@@ -94,3 +92,46 @@ jobs:
         with:
           generate_release_notes: true
           files: artifacts/*.tar.gz
+
+  update-brew:
+    needs: [release]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Update homebrew formula
+        env:
+          GH_TOKEN: ${{ secrets.BREW_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          TARBALL_URL="https://github.com/${{ github.repository }}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
+          SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | awk '{print $1}')
+
+          gh repo clone Velox0/brew /tmp/brew
+          cd /tmp/brew
+
+          cat > Formula/thingy.rb <<EOF
+          class Thingy < Formula
+            desc "Sakura-themed TUI editor with code execution"
+            homepage "https://github.com/Velox0/thingy"
+            url "${TARBALL_URL}"
+            sha256 "${SHA256}"
+            license "Unlicense"
+
+            depends_on "ncurses"
+            depends_on "curl"
+
+            def install
+              system "make"
+              bin.install "build/bin/thingy"
+            end
+
+            test do
+              system "#{bin}/thingy", "--help"
+            end
+          end
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/thingy.rb
+          git diff --cached --quiet || (git commit -m "Brew formula update for ${GITHUB_REF_NAME}" && git push)
