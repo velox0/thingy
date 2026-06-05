@@ -350,14 +350,17 @@ int folds_is_hidden_row(const FoldList* folds, int row) {
 }
 
 void folds_on_line_insert(FoldList* folds, int at_row) {
-  int i;
+  int i, j;
   for (i = 0; i < folds->count; i++) {
     if (folds->items[i].row >= at_row) folds->items[i].row++;
+    for (j = 0; j < folds->items[i].hidden_count; j++) {
+      if (folds->items[i].hidden_rows[j] >= at_row) folds->items[i].hidden_rows[j]++;
+    }
   }
 }
 
 void folds_on_line_delete(FoldList* folds, int at_row) {
-  int i;
+  int i, j;
   for (i = 0; i < folds->count;) {
     if (folds->items[i].row == at_row) {
       free_fold_entry(&folds->items[i]);
@@ -367,6 +370,9 @@ void folds_on_line_delete(FoldList* folds, int at_row) {
       continue;
     }
     if (folds->items[i].row > at_row) folds->items[i].row--;
+    for (j = 0; j < folds->items[i].hidden_count; j++) {
+      if (folds->items[i].hidden_rows[j] > at_row) folds->items[i].hidden_rows[j]--;
+    }
     i++;
   }
 }
