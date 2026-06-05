@@ -70,10 +70,11 @@ static int init_editor(Editor* ed, const char* filename) {
     refresh();
 
     ed->buffer.line_count = 0;
-    if (runner_fetch_url_stream(filename, &ed->buffer, fetch_progress, ed) != 0) {
+    ed->fetching          = 1;
+    if (runner_fetch_stream_start(&ed->stream_ctx, filename, &ed->buffer, fetch_progress, ed) !=
+        0) {
       set_status(ed, "Fetch failed.");
-    } else {
-      set_status(ed, "Fetched %s", filename);
+      ed->fetching = 0;
     }
     if (ed->buffer.line_count <= 0) {
       ensure_line_capacity(&ed->buffer, 1);
@@ -92,6 +93,10 @@ static int init_editor(Editor* ed, const char* filename) {
 }
 
 static void shutdown_editor(Editor* ed) {
+  if (ed->fetching) {
+    runner_fetch_stream_free(&ed->stream_ctx);
+    ed->fetching = 0;
+  }
   endwin();
   reset_shell_mode();
   free(ed->output_text);
@@ -222,6 +227,18 @@ int main(int argc, char** argv) {
   }
 
   while (!ed.should_quit) {
+    if (ed.fetching) {
+      int result = runner_fetch_stream_poll(&ed.stream_ctx);
+      if (result == 0) {
+        ed.fetching = 0;
+        set_status(&ed, "Fetched %s", ed.filename);
+        clamp_cursor(&ed);
+      } else if (result < 0) {
+        ed.fetching = 0;
+        set_status(&ed, "Fetch failed.");
+        clamp_cursor(&ed);
+      }
+    }
     refresh_screen(&ed);
     process_keypress(&ed);
   }

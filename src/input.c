@@ -245,6 +245,9 @@ void process_keypress(Editor* ed) {
       if (cursor_on_folded_row(ed)) {
         set_status(ed, "Unfold the collapsed line before editing.");
         break;
+      } else if (ed->fetching && ed->cy == ed->buffer.line_count - 1 && ed->cx == 0) {
+        set_status(ed, "Cannot edit during fetch.");
+        break;
       } else {
         int deleted_row = buffer_backspace(&ed->buffer, &ed->cy, &ed->cx);
         if (deleted_row >= 0) folds_on_line_delete(&ed->folds, deleted_row);
@@ -256,6 +259,8 @@ void process_keypress(Editor* ed) {
     case KEY_ENTER:
       if (cursor_on_folded_row(ed)) {
         set_status(ed, "Unfold the collapsed line before editing.");
+      } else if (ed->fetching && ed->cy == ed->buffer.line_count - 1) {
+        set_status(ed, "Cannot add lines during fetch.");
       } else {
         int inserted_row = buffer_insert_newline(&ed->buffer, &ed->cy, &ed->cx);
         if (inserted_row >= 0) folds_on_line_insert(&ed->folds, inserted_row);

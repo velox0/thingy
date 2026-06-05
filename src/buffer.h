@@ -16,7 +16,7 @@
 typedef struct {
   char** lines;
   int    line_count;
-  int    capacity;
+  int    capacity;  // allocated size of lines[] (grows via realloc)
 } TextBuffer;
 
 /*
@@ -64,7 +64,7 @@ typedef struct {
 typedef struct {
   FoldEntry* items;
   int        count;
-  int        capacity;
+  int        capacity;  // allocated size of items[] (grows via realloc)
 } FoldList;
 
 void buffer_init(TextBuffer* buf);

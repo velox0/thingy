@@ -17,24 +17,26 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 typedef struct {
-  TextBuffer buffer;
-  FoldList   folds;
-  int        cx;
-  int        cy;
-  int        row_offset;
-  int        col_offset;
-  int        screen_rows;
-  int        screen_cols;
-  int        output_visible;
-  int        output_scroll;
-  int        scroll_focus;
-  int        lang_popup_visible;
-  int        lang_selection;
-  char*      output_text;
-  char       current_lang[32];
-  char       status[256];
-  char       filename[PATH_MAX];
-  int        should_quit;
+  TextBuffer  buffer;
+  FoldList    folds;
+  int         cx;
+  int         cy;
+  int         row_offset;
+  int         col_offset;
+  int         screen_rows;
+  int         screen_cols;
+  int         output_visible;
+  int         output_scroll;
+  int         scroll_focus;
+  int         lang_popup_visible;
+  int         lang_selection;
+  char*       output_text;
+  char        current_lang[32];
+  char        status[256];
+  char        filename[PATH_MAX];
+  int         should_quit;
+  int         fetching;
+  FetchStream stream_ctx;
 } Editor;
 
 extern const char* lang_names[];
