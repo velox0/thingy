@@ -189,7 +189,9 @@ void draw_lang_popup(Editor* ed) {
 void draw_status(Editor* ed) {
   char line[512];
 
-  if (ed->output_visible && ed->scroll_focus) {
+  if (ed->status[0]) {
+    snprintf(line, sizeof(line), "%s", ed->status);
+  } else if (ed->output_visible && ed->scroll_focus) {
     snprintf(line, sizeof(line), "%s  Output [focused] (Up/Dn scroll)  |  ^O Close  ^Q Quit",
              ed->filename);
   } else {
