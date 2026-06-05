@@ -21,7 +21,7 @@ brew install thingy
 Clone the repo and build:
 
 ```bash
-git clone https://github.com/user/thingy.git
+git clone https://github.com/velox0/thingy.git
 cd thingy
 make
 ```

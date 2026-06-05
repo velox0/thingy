@@ -165,11 +165,44 @@ img {
 }
 
 .hero-content {
+  position: relative;
+  z-index: 2;
   max-width: var(--container);
   margin: 0 auto;
   width: 100%;
-  position: relative;
-  z-index: 2;
+}
+
+.hero-image {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 50vw;
+  max-width: 960px;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.hero-image img {
+  width: 100%;
+  height: auto;
+}
+
+
+
+@media (max-width: 600px) {
+  .hero {
+    justify-content: flex-start;
+    padding-top: 4rem;
+  }
+  .hero-content {
+    margin-top: 30vh;
+  }
+  .hero-image {
+    width: 100vw;
+    opacity: 0.7;
+    top: 35%;
+  }
 }
 
 .hero-eyebrow {
@@ -250,7 +283,7 @@ img {
   position: fixed;
   bottom: 0;
   left: 0;
-  right: 0;
+  width: 100vw;
   z-index: 90;
   display: flex;
   align-items: flex-end;
@@ -335,7 +368,7 @@ img {
 .dock {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: 0;
   padding: 0.5rem 0.6rem 0.4rem;
   background: transparent;
   border: none;
@@ -352,6 +385,14 @@ img {
   filter: brightness(0.75) saturate(0.85);
   will-change: transform, filter;
 }
+
+/* 3D perspective: left keys larger, right keys smaller */
+.dock-item:nth-child(1) .dock-key { width: 200px; }
+.dock-item:nth-child(2) .dock-key { width: 190px; }
+.dock-item:nth-child(3) .dock-key { width: 180px; }
+.dock-item:nth-child(4) .dock-key { width: 170px; }
+.dock-item:nth-child(5) .dock-key { width: 160px; }
+.dock-item:nth-child(6) .dock-key { width: 150px; }
 
 .dock-key img {
   width: 100%;
@@ -371,14 +412,14 @@ img {
 }
 
 /* left side fans left */
-.dock-item.mag-1.mag-left .dock-key { transform: translateY(-30px) scale(1.15) rotate(-10deg); filter: brightness(0.92) saturate(1); }
-.dock-item.mag-2.mag-left .dock-key { transform: translateY(-20px) scale(1.07) rotate(-18deg); filter: brightness(0.86) saturate(0.92); }
-.dock-item.mag-3.mag-left .dock-key { transform: translateY(-10px) scale(1.02) rotate(-24deg); filter: brightness(0.8)  saturate(0.88); }
+.dock-item.mag-1.mag-left .dock-key { transform: translateY(-30px) scale(1.15) rotate(5deg); filter: brightness(0.92) saturate(1); }
+.dock-item.mag-2.mag-left .dock-key { transform: translateY(-20px) scale(1.07) rotate(1deg); filter: brightness(0.86) saturate(0.92); }
+.dock-item.mag-3.mag-left .dock-key { transform: translateY(-10px) scale(1.02) rotate(-4deg); filter: brightness(0.8)  saturate(0.88); }
 
 /* right side fans right */
-.dock-item.mag-1.mag-right .dock-key { transform: translateY(-30px) scale(1.15) rotate(10deg); filter: brightness(0.92) saturate(1); }
-.dock-item.mag-2.mag-right .dock-key { transform: translateY(-20px) scale(1.07) rotate(18deg); filter: brightness(0.86) saturate(0.92); }
-.dock-item.mag-3.mag-right .dock-key { transform: translateY(-10px) scale(1.02) rotate(24deg); filter: brightness(0.8)  saturate(0.88); }
+.dock-item.mag-1.mag-right .dock-key { transform: translateY(-30px) scale(1.15) rotate(21deg); filter: brightness(0.92) saturate(1); }
+.dock-item.mag-2.mag-right .dock-key { transform: translateY(-20px) scale(1.07) rotate(33deg); filter: brightness(0.86) saturate(0.92); }
+.dock-item.mag-3.mag-right .dock-key { transform: translateY(-10px) scale(1.02) rotate(44deg); filter: brightness(0.8)  saturate(0.88); }
 
 /* tooltip */
 .dock-tooltip {
@@ -1002,6 +1043,87 @@ code {
     min-height: auto;
     padding: 3rem var(--gap) 0;
   }
+  .dock-item:nth-child(1) .dock-key { width: 170px; }
+  .dock-item:nth-child(2) .dock-key { width: 162px; }
+  .dock-item:nth-child(3) .dock-key { width: 154px; }
+  .dock-item:nth-child(4) .dock-key { width: 146px; }
+  .dock-item:nth-child(5) .dock-key { width: 138px; }
+  .dock-item:nth-child(6) .dock-key { width: 130px; }
+  .control-key { width: 180px; }
+  .dock {
+    gap: 1px;
+    padding: 0.4rem 0.5rem 0.3rem;
+  }
+  .feature-grid {
+    grid-template-columns: 1fr;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .palette-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .install-grid {
+    grid-template-columns: 1fr;
+  }
+  .dock-item.mag-0 .dock-key { transform: translateY(-28px) scale(1.2) rotate(0deg); }
+  .dock-item.mag-1.mag-left .dock-key { transform: translateY(-22px) scale(1.12) rotate(5deg); }
+  .dock-item.mag-1.mag-right .dock-key { transform: translateY(-22px) scale(1.12) rotate(21deg); }
+  .dock-item.mag-2.mag-left .dock-key { transform: translateY(-14px) scale(1.05) rotate(1deg); }
+  .dock-item.mag-2.mag-right .dock-key { transform: translateY(-14px) scale(1.05) rotate(33deg); }
+}
+
+@media (max-width: 700px) {
+  .dock-control {
+    display: none;
+  }
+  .dock-bar {
+    overflow-x: auto;
+    overflow-y: visible;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .dock-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .dock {
+    flex-shrink: 0;
+    padding: 0.4rem 0.6rem 0.3rem;
+  }
+  .dock-item:nth-child(1) .dock-key { width: 140px; }
+  .dock-item:nth-child(2) .dock-key { width: 133px; }
+  .dock-item:nth-child(3) .dock-key { width: 126px; }
+  .dock-item:nth-child(4) .dock-key { width: 119px; }
+  .dock-item:nth-child(5) .dock-key { width: 112px; }
+  .dock-item:nth-child(6) .dock-key { width: 105px; }
+}
+
+@media (max-width: 600px) {
+  .nav-links {
+    gap: 1rem;
+  }
+  .nav-links a:not(.nav-cta) {
+    display: none;
+  }
+  .dock-bar {
+    display: none;
+  }
+  .site-main {
+    padding-bottom: 2rem;
+  }
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+  .palette-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+  .swatch {
+    padding: 0.4rem;
+  }
+  .sw-label { font-size: 0.55rem; }
+  .sw-hex { font-size: 0.5rem; }
+}
   .dock-key {
     width: 140px;
   }
@@ -1025,10 +1147,10 @@ code {
     grid-template-columns: 1fr;
   }
   .dock-item.mag-0 .dock-key { transform: translateY(-28px) scale(1.2) rotate(0deg); }
-  .dock-item.mag-1.mag-left .dock-key { transform: translateY(-22px) scale(1.12) rotate(-8deg); }
-  .dock-item.mag-1.mag-right .dock-key { transform: translateY(-22px) scale(1.12) rotate(8deg); }
-  .dock-item.mag-2.mag-left .dock-key { transform: translateY(-14px) scale(1.05) rotate(-14deg); }
-  .dock-item.mag-2.mag-right .dock-key { transform: translateY(-14px) scale(1.05) rotate(14deg); }
+  .dock-item.mag-1.mag-left .dock-key { transform: translateY(-22px) scale(1.12) rotate(5deg); }
+  .dock-item.mag-1.mag-right .dock-key { transform: translateY(-22px) scale(1.12) rotate(21deg); }
+  .dock-item.mag-2.mag-left .dock-key { transform: translateY(-14px) scale(1.05) rotate(1deg); }
+  .dock-item.mag-2.mag-right .dock-key { transform: translateY(-14px) scale(1.05) rotate(33deg); }
 }
 
 @media (max-width: 700px) {
