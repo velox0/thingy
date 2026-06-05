@@ -601,7 +601,7 @@ img {
   color: #e0e0e0;
 }
 
-.terminal-line { color: var(--text); }
+.terminal-line { color: #e0e0e0; }
 .t-prompt { color: var(--accent); margin-right: 0.5rem; }
 .t-dim { color: var(--text-dim); }
 .t-success { color: var(--green); }
@@ -1055,9 +1055,7 @@ code {
     padding: 0.4rem 0.5rem 0.3rem;
   }
   .feature-grid {
-    grid-template-columns: 1fr;
-    max-width: 480px;
-    margin: 0 auto;
+    grid-template-columns: repeat(3, 1fr);
   }
   .palette-grid {
     grid-template-columns: repeat(4, 1fr);
@@ -1136,9 +1134,7 @@ code {
     border-radius: 14px 14px 0 0;
   }
   .feature-grid {
-    grid-template-columns: 1fr;
-    max-width: 480px;
-    margin: 0 auto;
+    grid-template-columns: repeat(3, 1fr);
   }
   .palette-grid {
     grid-template-columns: repeat(4, 1fr);
