@@ -1,0 +1,22 @@
+title: "thingy"
+description: "A cute pink TUI text editor that hits hard. Built in C with ncurses."
+url: ""
+baseurl: ""
+
+markdown: kramdown
+highlighter: rouge
+
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+
+sass:
+  sass_dir: assets/css
+  style: compressed
+
+plugins: []

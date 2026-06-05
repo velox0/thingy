@@ -1,0 +1,342 @@
+---
+layout: default
+---
+
+<section class="hero">
+  <div class="hero-content">
+    <span class="hero-eyebrow">&#x1F338; TUI EDITOR</span>
+    <h1>thing<span class="accent">y</span></h1>
+    <p class="hero-sub">
+      The toughest little blossom in your terminal.<br>
+      Pink outside. Lethal inside. Built in C.
+    </p>
+    <div class="hero-actions">
+      <a href="#install" class="btn btn-primary">&#x1F680; Get Started</a>
+      <a href="https://github.com/user/thingy" class="btn btn-secondary">&#x1F4E6; GitHub</a>
+    </div>
+  </div>
+
+  <div class="hero-feature-display" id="featureDisplay">
+    <div class="feature-display-inner active">
+      <span class="fd-key">DOCK</span>
+      <h3 class="fd-title">Navigate thingy</h3>
+      <p class="fd-desc">Hover a key to see its function. Click to jump to that section.</p>
+    </div>
+  </div>
+</section>
+
+<div class="dock-bar" id="dockBar">
+  <div class="dock-control">
+    <a class="control-key" href="#">
+      <img src="{{ '/assets/images/control.png' | relative_url }}" alt="Control" />
+      <div class="control-label">control</div>
+    </a>
+  </div>
+
+  <div class="dock" id="keyDock">
+    <div class="dock-item" data-key="r">
+      <a href="#run">
+        <div class="dock-key">
+          <img src="{{ '/assets/images/r.png' | relative_url }}" alt="R" />
+        </div>
+      </a>
+      <div class="dock-tooltip">
+        <span class="tooltip-key">^R</span>
+        <span class="tooltip-name">Aggressive Run</span>
+        <span class="tooltip-desc">Watch it execute.</span>
+      </div>
+    </div>
+    <div class="dock-item" data-key="f">
+      <a href="#features">
+        <div class="dock-key">
+          <img src="{{ '/assets/images/f.png' | relative_url }}" alt="F" />
+        </div>
+      </a>
+      <div class="dock-tooltip">
+        <span class="tooltip-key">^F</span>
+        <span class="tooltip-name">Tactical Folds</span>
+        <span class="tooltip-desc">The feature set.</span>
+      </div>
+    </div>
+    <div class="dock-item" data-key="s">
+      <a href="#sakura">
+        <div class="dock-key">
+          <img src="{{ '/assets/images/s.png' | relative_url }}" alt="S" />
+        </div>
+      </a>
+      <div class="dock-tooltip">
+        <span class="tooltip-key">^S</span>
+        <span class="tooltip-name">Sakura Palette</span>
+        <span class="tooltip-desc">The color system.</span>
+      </div>
+    </div>
+    <div class="dock-item" data-key="o">
+      <a href="#output">
+        <div class="dock-key">
+          <img src="{{ '/assets/images/o.png' | relative_url }}" alt="O" />
+        </div>
+      </a>
+      <div class="dock-tooltip">
+        <span class="tooltip-key">^O</span>
+        <span class="tooltip-name">The Pit</span>
+        <span class="tooltip-desc">Output panel preview.</span>
+      </div>
+    </div>
+    <div class="dock-item" data-key="l">
+      <a href="#install">
+        <div class="dock-key">
+          <img src="{{ '/assets/images/l.png' | relative_url }}" alt="L" />
+        </div>
+      </a>
+      <div class="dock-tooltip">
+        <span class="tooltip-key">^L</span>
+        <span class="tooltip-name">Install</span>
+        <span class="tooltip-desc">Get thingy running.</span>
+      </div>
+    </div>
+    <div class="dock-item" data-key="w">
+      <a href="https://github.com/user/thingy">
+        <div class="dock-key">
+          <img src="{{ '/assets/images/w.png' | relative_url }}" alt="W" />
+        </div>
+      </a>
+      <div class="dock-tooltip">
+        <span class="tooltip-key">^W</span>
+        <span class="tooltip-name">Source</span>
+        <span class="tooltip-desc">View on GitHub.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="run-section" id="run">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#x1F680; Aggressive Run</h2>
+      <p>Hit <code>^R</code>. thingy forces your code to execute.</p>
+    </div>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <span class="terminal-dot"></span>
+        <span class="terminal-dot"></span>
+        <span class="terminal-dot"></span>
+        <span class="terminal-title">thingy — bash</span>
+      </div>
+      <div class="terminal-body">
+        <div class="terminal-line"><span class="t-prompt">$</span> thingy main.c</div>
+        <div class="terminal-line t-dim">[lang: c] [file: main.c]</div>
+        <div class="terminal-line t-dim">compiling...</div>
+        <div class="terminal-line t-success">build ok</div>
+        <div class="terminal-line">&nbsp;</div>
+        <div class="terminal-line"><span class="t-prompt">$</span> <span class="t-cursor">&#x2588;</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="features" id="features">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#x1F380; The Arsenal</h2>
+      <p>Soft pinks. Hard C. No compromises.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">&#x1F338;</div>
+        <h3>Sakura Palette</h3>
+        <p>Visual intimidation via soft pinks. It's called psychological warfare.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x1F310;</div>
+        <h3>Remote Fetch</h3>
+        <p>Paste a URL, thingy pulls the code and runs it. No questions asked.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x1F3AF;</div>
+        <h3>Smart Language</h3>
+        <p>Auto-detects language or pick manually. thingy adapts to your mission.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sakura-section" id="sakura">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#x1F338; Sakura Palette</h2>
+      <p>The color system behind the intimidation.</p>
+    </div>
+    <div class="palette-grid">
+      <div class="swatch" style="--sw: #fff0f5"><span class="sw-label">pink-100</span><span class="sw-hex">#fff0f5</span></div>
+      <div class="swatch" style="--sw: #ffd6e7"><span class="sw-label">pink-200</span><span class="sw-hex">#ffd6e7</span></div>
+      <div class="swatch" style="--sw: #ffb3d1"><span class="sw-label">pink-300</span><span class="sw-hex">#ffb3d1</span></div>
+      <div class="swatch" style="--sw: #ff8ab7"><span class="sw-label">pink-400</span><span class="sw-hex">#ff8ab7</span></div>
+      <div class="swatch swatch-dark" style="--sw: #ff69b4"><span class="sw-label">pink-500</span><span class="sw-hex">#ff69b4</span></div>
+      <div class="swatch swatch-dark" style="--sw: #e84d93"><span class="sw-label">pink-600</span><span class="sw-hex">#e84d93</span></div>
+      <div class="swatch swatch-dark" style="--sw: #c42d78"><span class="sw-label">pink-700</span><span class="sw-hex">#c42d78</span></div>
+      <div class="swatch swatch-dark" style="--sw: #9b1b5a"><span class="sw-label">pink-800</span><span class="sw-hex">#9b1b5a</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="output-section" id="output">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#x1F4A8; The Pit</h2>
+      <p>A dedicated output panel where your errors go to die.</p>
+    </div>
+    <div class="output-panel">
+      <div class="output-bar">
+        <span class="output-title">output</span>
+        <span class="output-status">exit 1</span>
+      </div>
+      <div class="output-body">
+        <div class="output-line"><span class="o-file">main.c</span><span class="o-sep">:</span><span class="o-line">12</span><span class="o-sep">:</span> <span class="o-err">error:</span> implicit declaration of function 'pritnf'</div>
+        <div class="output-line"><span class="o-file">main.c</span><span class="o-sep">:</span><span class="o-line">12</span><span class="o-sep">:</span> <span class="o-note">note:</span> did you mean 'printf'?</div>
+        <div class="output-line">&nbsp;</div>
+        <div class="output-line"><span class="o-file">main.c</span><span class="o-sep">:</span><span class="o-line">15</span><span class="o-sep">:</span> <span class="o-err">error:</span> expected ';' before 'return'</div>
+        <div class="output-line">&nbsp;</div>
+        <div class="output-line"><span class="o-summary">2 errors generated.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="install-section-home" id="install">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#x1F680; Deploy thingy</h2>
+      <p>Up and running in seconds.</p>
+    </div>
+    <div class="install-grid">
+      <div class="install-option">
+        <h3>Homebrew</h3>
+        <div class="install-code">
+          <code>brew tap velox0/brew && brew install thingy</code>
+        </div>
+      </div>
+      <div class="install-option">
+        <h3>From source</h3>
+        <div class="install-code">
+          <code>git clone https://github.com/user/thingy && cd thingy && make</code>
+        </div>
+      </div>
+    </div>
+    <div style="text-align: center; margin-top: 2rem;">
+      <a href="/install" class="btn btn-secondary">Full Install Guide &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<script>
+(function() {
+  const dockBar = document.getElementById('dockBar');
+  const dock = document.getElementById('keyDock');
+  const items = Array.from(dock.querySelectorAll('.dock-item'));
+  const display = document.getElementById('featureDisplay');
+  const inner = display.querySelector('.feature-display-inner');
+
+  const features = {
+    r: { key: '^R', title: 'Aggressive Run', desc: 'Forces your code to execute. It doesn\'t ask. It commands.' },
+    f: { key: '^F', title: 'Tactical Folds', desc: 'Collapses code like a folding chair to the face. Hide the mess.' },
+    s: { key: '^S', title: 'Sakura Palette', desc: 'The pink color system behind the intimidation.' },
+    o: { key: '^O', title: 'The Pit', desc: 'Output panel where your errors go to die. In leaf-green.' },
+    l: { key: '^L', title: 'Install', desc: 'Get thingy running. Homebrew or build from source.' },
+    w: { key: '^W', title: 'Source', desc: 'View the code on GitHub. Open source. No secrets.' },
+    control: { key: 'CTRL', title: 'Control', desc: 'The modifier. The enabler. Back to top.' }
+  };
+
+  function showFeature(id) {
+    const f = features[id];
+    if (!f) return;
+    inner.querySelector('.fd-key').textContent = f.key;
+    inner.querySelector('.fd-title').textContent = f.title;
+    inner.querySelector('.fd-desc').textContent = f.desc;
+    display.classList.add('active');
+  }
+
+  function resetFeature() {
+    display.classList.remove('active');
+  }
+
+  // macOS fan magnification — affects ALL keys
+  function clearMagnification() {
+    items.forEach(item => {
+      item.classList.remove('mag-lift', 'mag-0', 'mag-1', 'mag-2', 'mag-3', 'mag-left', 'mag-right');
+    });
+  }
+
+  function applyMagnification(hoveredIdx) {
+    clearMagnification();
+    items[hoveredIdx].classList.add('mag-lift', 'mag-0');
+
+    for (let i = hoveredIdx - 1, dist = 1; i >= 0; i--, dist++) {
+      const cls = dist <= 3 ? 'mag-' + dist : 'mag-3';
+      items[i].classList.add(cls, 'mag-left');
+    }
+    for (let i = hoveredIdx + 1, dist = 1; i < items.length; i++, dist++) {
+      const cls = dist <= 3 ? 'mag-' + dist : 'mag-3';
+      items[i].classList.add(cls, 'mag-right');
+    }
+
+    // control key reacts too
+    const ctrl = document.querySelector('.control-key');
+    if (ctrl) ctrl.classList.add('dock-active-ctrl');
+  }
+
+  function clearControl() {
+    const ctrl = document.querySelector('.control-key');
+    if (ctrl) ctrl.classList.remove('dock-active-ctrl');
+  }
+
+  items.forEach((item, idx) => {
+    item.addEventListener('mouseenter', () => {
+      dockBar.classList.add('dock-active');
+      applyMagnification(idx);
+      showFeature(item.dataset.key);
+    });
+    item.addEventListener('mouseleave', () => {
+      dockBar.classList.remove('dock-active');
+      clearMagnification();
+      clearControl();
+      resetFeature();
+    });
+  });
+
+  const ctrl = document.querySelector('.control-key');
+  if (ctrl) {
+    ctrl.addEventListener('mouseenter', () => showFeature('control'));
+    ctrl.addEventListener('mouseleave', resetFeature);
+  }
+
+  // dock hide logic at page bottom
+  let atBottom = false;
+  let dockHidden = false;
+
+  document.addEventListener('mousemove', (e) => {
+    const fromBottom = window.innerHeight - e.clientY;
+    const scrollY = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight;
+    const winHeight = window.innerHeight;
+    const scrolledNearBottom = (scrollY + winHeight) > (docHeight - 300);
+    const cursorNearBottom = fromBottom < 150;
+
+    if (scrolledNearBottom) {
+      if (!atBottom) atBottom = true;
+      if (cursorNearBottom && dockHidden) {
+        dockBar.classList.remove('dock-hidden');
+        dockHidden = false;
+      } else if (!cursorNearBottom && !dockHidden) {
+        dockBar.classList.add('dock-hidden');
+        dockHidden = true;
+      }
+    } else {
+      if (atBottom) atBottom = false;
+      if (dockHidden) {
+        dockBar.classList.remove('dock-hidden');
+        dockHidden = false;
+      }
+    }
+  });
+})();
+</script>

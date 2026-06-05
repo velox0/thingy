@@ -2,3 +2,11 @@ thingy
 *.orig
 build/
 *.o
+
+# jekyll
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+vendor/
+Gemfile.lock
