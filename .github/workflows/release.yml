@@ -116,7 +116,7 @@ jobs:
           cat > Formula/thingy.rb <<EOF
           class Thingy < Formula
             desc "Sakura-themed TUI editor with code execution"
-            homepage "https://github.com/Velox0/thingy"
+            homepage "https://velox0.github.io/thingy/"
             url "${TARBALL_URL}"
             sha256 "${SHA256}"
             license "Unlicense"
