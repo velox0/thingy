@@ -235,13 +235,31 @@ img {
   padding: 0.4rem 1rem;
   font-weight: 600;
   border-radius: 6px;
-  transition: all 0.3s var(--ease-out-expo);
+  position: relative;
+  transition: all 0.3s ease-in-out;
+}
+
+.nav-cta::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 4px 16px rgba(255, 105, 180, 0.35);
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  pointer-events: none;
 }
 
 .nav-cta:hover {
   background: var(--pink-600);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(255, 105, 180, 0.35);
+}
+
+.nav-cta:hover::after {
+  opacity: 1;
+}
+
+.nav-cta:active {
+  transform: scale(0.96);
 }
 
 /* ---- HAMBURGER MENU ---- */
@@ -825,11 +843,6 @@ img {
 .feature-icon {
   font-size: 1.6rem;
   margin-bottom: 0.7rem;
-  transition: transform 0.4s var(--ease-spring);
-}
-
-.feature-card:hover .feature-icon {
-  transform: scale(1.2) rotate(-5deg);
 }
 
 .feature-card h3 {

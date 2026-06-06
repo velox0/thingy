@@ -321,8 +321,8 @@ layout: default
     const scrollY = window.scrollY;
     const docHeight = document.documentElement.scrollHeight;
     const winHeight = window.innerHeight;
-    const scrolledNearBottom = (scrollY + winHeight) > (docHeight - 300);
-    const cursorNearBottom = fromBottom < 150;
+    const scrolledNearBottom = (scrollY + winHeight) > (docHeight - 150);
+    const cursorNearBottom = fromBottom < 70;
 
     if (scrolledNearBottom) {
       if (!atBottom) atBottom = true;
