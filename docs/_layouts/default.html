@@ -18,5 +18,44 @@
     {{ content }}
   </main>
   {% include footer.html %}
+
+  <script>
+  (function() {
+    /* ---- Scroll-reveal via IntersectionObserver ---- */
+    var reveals = document.querySelectorAll('.reveal, .reveal-scale');
+    if (reveals.length && 'IntersectionObserver' in window) {
+      var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+      reveals.forEach(function(el) { observer.observe(el); });
+    } else {
+      /* Fallback: show everything immediately */
+      reveals.forEach(function(el) { el.classList.add('revealed'); });
+    }
+
+    /* ---- Hamburger toggle ---- */
+    var toggle = document.getElementById('navToggle');
+    var mobile = document.getElementById('navMobile');
+    if (toggle && mobile) {
+      toggle.addEventListener('click', function() {
+        toggle.classList.toggle('active');
+        mobile.classList.toggle('open');
+      });
+      /* Close menu when a link is clicked */
+      mobile.querySelectorAll('a').forEach(function(link) {
+        link.addEventListener('click', function() {
+          toggle.classList.remove('active');
+          mobile.classList.remove('open');
+        });
+      });
+    }
+  })();
+  </script>
 </body>
 </html>
