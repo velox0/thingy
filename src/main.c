@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "editor.h"
@@ -237,6 +238,14 @@ int main(int argc, char** argv) {
         ed.fetching = 0;
         set_status(&ed, "Fetch failed.");
         clamp_cursor(&ed);
+      }
+    }
+    if (ed.status[0]) {
+      struct timeval tv;
+      gettimeofday(&tv, NULL);
+      double now = tv.tv_sec + tv.tv_usec / 1000000.0;
+      if (now - ed.status_time >= 3.0) {
+        ed.status[0] = '\0';
       }
     }
     refresh_screen(&ed);

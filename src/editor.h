@@ -33,6 +33,7 @@ typedef struct {
   char*       output_text;
   char        current_lang[32];
   char        status[256];
+  double      status_time;
   char        filename[PATH_MAX];
   int         should_quit;
   int         fetching;

@@ -70,6 +70,8 @@ void run(Editor* ed) {
 void process_keypress(Editor* ed) {
   int ch = getch();
 
+  if (ch == ERR) return;
+
   if (ed->lang_popup_visible) {
     switch (ch) {
       case CTRL_KEY('l'):

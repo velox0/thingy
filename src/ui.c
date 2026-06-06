@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "editor.h"
 
@@ -25,6 +26,9 @@ void set_status(Editor* ed, const char* fmt, ...) {
   va_start(ap, fmt);
   vsnprintf(ed->status, sizeof(ed->status), fmt, ap);
   va_end(ap);
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  ed->status_time = tv.tv_sec + tv.tv_usec / 1000000.0;
 }
 
 void set_output(Editor* ed, const char* text) {
@@ -403,6 +407,7 @@ void init_ncurses(void) {
   raw();
   noecho();
   keypad(stdscr, TRUE);
+  timeout(100);
   set_escdelay(25);
   mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED, NULL);
   mouseinterval(0);
