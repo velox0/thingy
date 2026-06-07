@@ -130,11 +130,11 @@ static int run_cli(const char* path, const char* lang, int verbose) {
 
     buffer_init(&buf);
     if (is_url) {
-      char*       content = NULL;
-      FILE*       fp;
+      char*        content = NULL;
+      FILE*        fp;
       FetchOptions opts = {0};
-      opts.verbose     = verbose;
-      opts.max_retries = 3;
+      opts.verbose      = verbose;
+      opts.max_retries  = 3;
       if (runner_fetch_url(path, &content, &opts) != 0 || !content) {
         fprintf(stderr, "%s", content ? content : "Error fetching URL\n");
         free(content);
@@ -159,7 +159,7 @@ static int run_cli(const char* path, const char* lang, int verbose) {
         return 1;
       }
       remove(tmppath);
-      snprintf(tmppath, sizeof(tmppath), "/tmp/%d_%s.c", getpid(), safe_name);
+      snprintf(tmppath, sizeof(tmppath), "/tmp/%d_%s", getpid(), safe_name);
     } else {
       if (buffer_load_file(&buf, path, err, sizeof(err)) != 0) {
         fprintf(stderr, "Error loading %s: %s\n", path, err);
@@ -167,7 +167,7 @@ static int run_cli(const char* path, const char* lang, int verbose) {
         return 1;
       }
       ext = strrchr(path, '.');
-      snprintf(tmppath, sizeof(tmppath), "/tmp/%d_%s%s", getpid(), safe_name, ext ? ext : ".c");
+      snprintf(tmppath, sizeof(tmppath), "/tmp/%d_%s%s", getpid(), safe_name, ext ? ext : "");
     }
   }
 

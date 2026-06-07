@@ -21,8 +21,8 @@ typedef struct {
 } FetchStream;
 
 typedef struct {
-  int   verbose;
-  int   max_retries;
+  int verbose;
+  int max_retries;
   void (*on_status)(void* ctx, const char* msg);
   void* status_ctx;
 } FetchOptions;

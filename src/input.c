@@ -38,7 +38,7 @@ void run(Editor* ed) {
     if (base_len > (int)sizeof(base_no_ext) - 1) base_len = (int)sizeof(base_no_ext) - 1;
     memcpy(base_no_ext, base, (size_t)base_len);
     base_no_ext[base_len] = '\0';
-    snprintf(tmppath, sizeof(tmppath), "/tmp/%d_%s%s", getpid(), base_no_ext, ext ? ext : ".c");
+    snprintf(tmppath, sizeof(tmppath), "/tmp/%d_%s%s", getpid(), base_no_ext, ext ? ext : "");
   }
   if (buffer_save_file_filtered(&ed->buffer, tmppath, err, sizeof(err)) != 0) {
     set_status(ed, "Run failed: %s", err);

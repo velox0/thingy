@@ -169,6 +169,69 @@ static const char* interpreter_for_extension(const char* ext) {
   return NULL;
 }
 
+static const char* interpreter_from_shebang(const char* file_path) {
+  FILE* fp;
+  char  line[1024];
+  char* nl;
+  const char* shebang;
+  const char* prog;
+
+  fp = fopen(file_path, "r");
+  if (!fp) return NULL;
+
+  if (!fgets(line, sizeof(line), fp)) {
+    fclose(fp);
+    return NULL;
+  }
+  fclose(fp);
+
+  /* strip trailing newline */
+  nl = strchr(line, '\n');
+  if (nl) *nl = '\0';
+  nl = strchr(line, '\r');
+  if (nl) *nl = '\0';
+
+  if (strncmp(line, "#!", 2) != 0) return NULL;
+  shebang = line + 2;
+
+  /* skip leading spaces */
+  while (*shebang == ' ' || *shebang == '\t') shebang++;
+
+  /* #!/usr/bin/env <prog> — extract prog */
+  prog = strstr(shebang, "/env ");
+  if (prog) {
+    prog += 5;
+    while (*prog == ' ' || *prog == '\t') prog++;
+    /* skip "python" -> "python3" if it's just "python" */
+    if (strcmp(prog, "python") == 0 || strcmp(prog, "python2") == 0) return "python3";
+    if (strcmp(prog, "python3") == 0) return "python3";
+    if (strcmp(prog, "node") == 0 || strcmp(prog, "nodejs") == 0) return "node";
+    if (strcmp(prog, "ruby") == 0) return "ruby";
+    if (strcmp(prog, "php") == 0) return "php";
+    if (strcmp(prog, "perl") == 0) return "perl";
+    if (strcmp(prog, "sh") == 0 || strcmp(prog, "bash") == 0 || strcmp(prog, "zsh") == 0) return "sh";
+    return NULL;
+  }
+
+  /* #!/bin/<prog> — extract basename */
+  prog = strrchr(shebang, '/');
+  if (prog) {
+    prog++;
+  } else {
+    prog = shebang;
+  }
+
+  if (strcmp(prog, "python") == 0 || strcmp(prog, "python2") == 0) return "python3";
+  if (strcmp(prog, "python3") == 0) return "python3";
+  if (strcmp(prog, "node") == 0 || strcmp(prog, "nodejs") == 0) return "node";
+  if (strcmp(prog, "ruby") == 0) return "ruby";
+  if (strcmp(prog, "php") == 0) return "php";
+  if (strcmp(prog, "perl") == 0) return "perl";
+  if (strcmp(prog, "sh") == 0 || strcmp(prog, "bash") == 0 || strcmp(prog, "zsh") == 0) return "sh";
+
+  return NULL;
+}
+
 static char* combine_output(const char* a, const char* b) {
   if ((!a || a[0] == '\0') && (!b || b[0] == '\0')) return dup_str("(no output)\n");
   if (!a || a[0] == '\0') return dup_str(b);
@@ -352,11 +415,18 @@ RunResult runner_smart_run(const char* file_path, const char* lang_override, cha
         interpreter = "sh";
     } else {
       interpreter = interpreter_for_extension(ext);
+      if (!interpreter) interpreter = interpreter_from_shebang(file_path);
     }
     if (interpreter) {
       cmd = fmt_str("cd %s && %s %s 2>&1", q_cwd, interpreter, q_file);
     } else {
-      cmd = fmt_str("cd %s && sh %s 2>&1", q_cwd, q_file);
+      *output = fmt_str(
+          "Unknown language for '%s'. Use --lang to specify, or add a shebang (#!) or a "
+          "recognized extension (.py, .js, .rb, .php, .pl, .sh).\n",
+          file_path);
+      free(q_file);
+      free(q_cwd);
+      return RUN_INTERNAL_ERROR;
     }
     if (!cmd || run_command_capture(cmd, &run_out, &run_code) != 0) {
       free(cmd);
