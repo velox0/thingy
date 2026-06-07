@@ -68,12 +68,17 @@ static int init_editor(Editor* ed, const char* filename) {
            (strncmp(filename, "http://", 7) == 0 || strncmp(filename, "https://", 8) == 0);
 
   if (is_stdin) {
-    init_ncurses();
+    snprintf(ed->filename, sizeof(ed->filename), "stdin");
     if (buffer_load_stdin(&ed->buffer, err, sizeof(err)) != 0) {
-      set_status(ed, "Read failed: %s", err);
-    } else {
-      set_status(ed, "Read from stdin (%d lines)", ed->buffer.line_count);
+      fprintf(stderr, "Failed to read stdin: %s\n", err);
+      return -1;
     }
+    if (!freopen("/dev/tty", "r", stdin)) {
+      fprintf(stderr, "Failed to reopen terminal for input.\n");
+      return -1;
+    }
+    init_ncurses();
+    set_status(ed, "Read from stdin (%d lines)", ed->buffer.line_count);
   } else if (is_url) {
     init_ncurses();
     set_status(ed, "Fetching %s ...", filename);
@@ -228,6 +233,33 @@ int main(int argc, char** argv) {
     }
 
     if (!path) {
+      if (!isatty(STDIN_FILENO)) {
+        TextBuffer buf;
+        char       err[256];
+        char       tmppath[PATH_MAX];
+        char*      output = NULL;
+        RunResult  result;
+
+        buffer_init(&buf);
+        if (buffer_load_stdin(&buf, err, sizeof(err)) != 0) {
+          fprintf(stderr, "Error reading stdin: %s\n", err);
+          buffer_free(&buf);
+          return 1;
+        }
+        snprintf(tmppath, sizeof(tmppath), "/tmp/thingy_stdin_%d", getpid());
+        if (buffer_save_file_filtered(&buf, tmppath, err, sizeof(err)) != 0) {
+          fprintf(stderr, "Error preparing stdin: %s\n", err);
+          remove(tmppath);
+          buffer_free(&buf);
+          return 1;
+        }
+        result = runner_smart_run(tmppath, lang, &output);
+        remove(tmppath);
+        buffer_free(&buf);
+        if (output && output[0]) printf("%s", output);
+        free(output);
+        return result == RUN_OK ? 0 : 1;
+      }
       fprintf(stderr, "Usage: thingy --run [-v] [--lang <lang>] <file|url>\n");
       return 1;
     }
