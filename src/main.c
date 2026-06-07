@@ -21,7 +21,8 @@ static void print_usage(void) {
       "\n"
       " Options:\n"
       "   -h, --help              Show this help and retreat\n"
-      "   -v, --version           Show version and stand down\n"
+      "   --version               Show version and stand down\n"
+      "   -v, --verbose           Verbose fetch output (--run mode only)\n"
       "   --run                   Execute a file without the TUI\n"
       "   --lang <lang>           Force language (c, python, node, ruby, php, perl, sh)\n"
       "\n"
@@ -105,7 +106,7 @@ static void shutdown_editor(Editor* ed) {
   folds_free(&ed->folds);
 }
 
-static int run_cli(const char* path, const char* lang) {
+static int run_cli(const char* path, const char* lang, int verbose) {
   TextBuffer  buf;
   char        err[256];
   char        tmppath[PATH_MAX];
@@ -129,9 +130,12 @@ static int run_cli(const char* path, const char* lang) {
 
     buffer_init(&buf);
     if (is_url) {
-      char* content = NULL;
-      FILE* fp;
-      if (runner_fetch_url(path, &content) != 0 || !content) {
+      char*       content = NULL;
+      FILE*       fp;
+      FetchOptions opts = {0};
+      opts.verbose     = verbose;
+      opts.max_retries = 3;
+      if (runner_fetch_url(path, &content, &opts) != 0 || !content) {
         fprintf(stderr, "%s", content ? content : "Error fetching URL\n");
         free(content);
         buffer_free(&buf);
@@ -194,18 +198,17 @@ int main(int argc, char** argv) {
       print_usage();
       return 0;
     }
-    if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0) {
-      printf("thingy %s\n", GIT_VERSION);
-      return 0;
-    }
   }
 
   if (argc > 1 && strcmp(argv[1], "--run") == 0) {
-    const char* path = NULL;
-    const char* lang = NULL;
+    int         verbose = 0;
+    const char* path    = NULL;
+    const char* lang    = NULL;
 
     for (i = 2; i < argc; i++) {
-      if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc) {
+      if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
+        verbose = 1;
+      } else if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc) {
         lang = argv[++i];
       } else if (!path) {
         path = argv[i];
@@ -213,11 +216,19 @@ int main(int argc, char** argv) {
     }
 
     if (!path) {
-      fprintf(stderr, "Usage: thingy --run [--lang <lang>] <file|url>\n");
-      return 1;
+      printf("thingy %s\n", GIT_VERSION);
+      return 0;
     }
 
-    return run_cli(path, lang);
+    return run_cli(path, lang, verbose);
+  }
+
+  /* standalone -v/--version (outside --run) */
+  for (i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0) {
+      printf("thingy %s\n", GIT_VERSION);
+      return 0;
+    }
   }
 
   if (check_terminal() != 0) return 1;

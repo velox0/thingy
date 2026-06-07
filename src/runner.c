@@ -7,8 +7,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 #include <curl/curl.h>
 
@@ -384,40 +387,226 @@ static size_t write_callback(void* ptr, size_t size, size_t nmemb, void* userdat
   return size * nmemb;
 }
 
-int runner_fetch_url(const char* url, char** content) {
-  CURL*    curl;
-  CURLcode res;
-  long     http_code = 0;
+static const char* http_status_phrase(long code) {
+  switch (code) {
+    case 100:
+      return "Continue";
+    case 101:
+      return "Switching Protocols";
+    case 200:
+      return "OK";
+    case 201:
+      return "Created";
+    case 204:
+      return "No Content";
+    case 301:
+      return "Moved Permanently";
+    case 302:
+      return "Found";
+    case 303:
+      return "See Other";
+    case 304:
+      return "Not Modified";
+    case 307:
+      return "Temporary Redirect";
+    case 308:
+      return "Permanent Redirect";
+    case 400:
+      return "Bad Request";
+    case 401:
+      return "Unauthorized";
+    case 403:
+      return "Forbidden";
+    case 404:
+      return "Not Found";
+    case 405:
+      return "Method Not Allowed";
+    case 408:
+      return "Request Timeout";
+    case 429:
+      return "Too Many Requests";
+    case 500:
+      return "Internal Server Error";
+    case 502:
+      return "Bad Gateway";
+    case 503:
+      return "Service Unavailable";
+    case 504:
+      return "Gateway Timeout";
+    default:
+      return NULL;
+  }
+}
+
+static int should_retry_http(long code) {
+  return code == 500 || code == 502 || code == 503 || code == 504;
+}
+
+static int should_retry_network(CURLcode code) {
+  return code == CURLE_COULDNT_CONNECT || code == CURLE_COULDNT_RESOLVE_HOST ||
+         code == CURLE_OPERATION_TIMEDOUT || code == CURLE_SEND_ERROR || code == CURLE_RECV_ERROR;
+}
+
+typedef struct {
+  char location[2048];
+  int  got_location;
+  int  redirect_count;
+  int  verbose;
+} RedirectHeaderData;
+
+static size_t redirect_header_cb(char* buffer, size_t size, size_t nitems, void* userdata) {
+  RedirectHeaderData* data  = (RedirectHeaderData*)userdata;
+  size_t              total = size * nitems;
+
+  if (total > 10 && strncasecmp(buffer, "Location: ", 10) == 0) {
+    size_t val_len = total - 10;
+    if (val_len >= sizeof(data->location)) val_len = sizeof(data->location) - 1;
+    memcpy(data->location, buffer + 10, val_len);
+    data->location[val_len] = '\0';
+    while (val_len > 0 &&
+           (data->location[val_len - 1] == '\r' || data->location[val_len - 1] == '\n'))
+      data->location[--val_len] = '\0';
+    data->got_location = 1;
+    data->redirect_count++;
+    if (data->verbose) {
+      fprintf(stderr, "thingy:   -> %s\n", data->location);
+    }
+  }
+  return total;
+}
+
+static void verbose_print(int verbose, const char* fmt, ...) {
+  va_list ap;
+  if (!verbose) return;
+  va_start(ap, fmt);
+  fprintf(stderr, "thingy: ");
+  vfprintf(stderr, fmt, ap);
+  fprintf(stderr, "\n");
+  va_end(ap);
+}
+
+static void notify_status(const FetchOptions* opts, const char* fmt, ...) {
+  va_list ap;
+  if (!opts || !opts->on_status) return;
+  va_start(ap, fmt);
+  {
+    char msg[512];
+    vsnprintf(msg, sizeof(msg), fmt, ap);
+    opts->on_status(opts->status_ctx, msg);
+  }
+  va_end(ap);
+}
+
+int runner_fetch_url(const char* url, char** content, const FetchOptions* opts) {
+  CURL*           curl;
+  CURLcode        res;
+  long            http_code   = 0;
+  int             attempt     = 0;
+  int             max_retries = (opts && opts->max_retries > 0) ? opts->max_retries : 3;
+  int             verbose     = (opts && opts->verbose);
+  double          backoff     = 1.0;
+  struct timespec ts;
 
   *content = dup_str("");
   if (!*content) return -1;
 
-  curl = curl_easy_init();
-  if (!curl) return -1;
+  for (attempt = 0; attempt <= max_retries; attempt++) {
+    RedirectHeaderData redir = {{0}, 0, 0, verbose};
 
-  curl_easy_setopt(curl, CURLOPT_URL, url);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, content);
-  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    if (attempt > 0) {
+      verbose_print(verbose, "Retrying in %.0fs... (attempt %d/%d)", backoff, attempt + 1,
+                    max_retries + 1);
+      notify_status(opts, "Retrying (%d/%d)...", attempt + 1, max_retries + 1);
+      ts.tv_sec  = (time_t)backoff;
+      ts.tv_nsec = (long)((backoff - ts.tv_sec) * 1e9);
+      nanosleep(&ts, NULL);
+      free(*content);
+      *content = dup_str("");
+      if (!*content) return -1;
+    } else {
+      verbose_print(verbose, "GET %s", url);
+      notify_status(opts, "Fetching %s ...", url);
+    }
 
-  res = curl_easy_perform(curl);
-  if (res != CURLE_OK) {
-    free(*content);
-    *content = fmt_str("Network error: %s\n", curl_easy_strerror(res));
+    curl = curl_easy_init();
+    if (!curl) {
+      free(*content);
+      *content = dup_str("Failed to initialize curl.\n");
+      return -1;
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "thingy/1.0");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, content);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, redirect_header_cb);
+    curl_easy_setopt(curl, CURLOPT_HEADERDATA, &redir);
+
+    res = curl_easy_perform(curl);
+
+    if (res != CURLE_OK) {
+      verbose_print(verbose, "Attempt %d failed: %s", attempt + 1, curl_easy_strerror(res));
+      curl_easy_cleanup(curl);
+
+      if (attempt < max_retries && should_retry_network(res)) {
+        backoff *= 2.0;
+        continue;
+      }
+
+      free(*content);
+      *content = fmt_str("Network error fetching %s: %s\n", url, curl_easy_strerror(res));
+      notify_status(opts, "Fetch failed: %s", curl_easy_strerror(res));
+      return -1;
+    }
+
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
     curl_easy_cleanup(curl);
+
+    if (http_code == 200) {
+      const char* phrase = http_status_phrase(http_code);
+      verbose_print(verbose, "%ld %s", http_code, phrase ? phrase : "OK");
+      notify_status(opts, "Fetched %s", url);
+      return 0;
+    }
+
+    if (http_code != 200) {
+      const char* phrase = http_status_phrase(http_code);
+      verbose_print(verbose, "%ld %s", http_code, phrase ? phrase : "");
+    }
+
+    if (attempt < max_retries && should_retry_http(http_code)) {
+      backoff *= 2.0;
+      continue;
+    }
+
+    {
+      const char* phrase = http_status_phrase(http_code);
+      char*       hint   = dup_str("");
+      if (http_code == 401 || http_code == 403) {
+        free(hint);
+        hint = dup_str(" (authentication may be required)");
+      } else if (http_code == 404) {
+        free(hint);
+        hint = dup_str(" (resource not found)");
+      } else if (http_code == 429) {
+        free(hint);
+        hint = dup_str(" (rate limited)");
+      }
+      free(*content);
+      *content = fmt_str("HTTP %ld %s fetching %s%s\n", http_code, phrase ? phrase : "", url, hint);
+      free(hint);
+    }
+    notify_status(opts, "HTTP %ld %s", http_code,
+                  http_status_phrase(http_code) ? http_status_phrase(http_code) : "");
     return -1;
   }
 
-  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-  curl_easy_cleanup(curl);
-
-  if (http_code != 200) {
-    free(*content);
-    *content = fmt_str("HTTP error: %ld\n", http_code);
-    return -1;
-  }
-  return 0;
+  free(*content);
+  *content = fmt_str("Failed after %d attempts\n", max_retries + 1);
+  return -1;
 }
 
 /* libcurl write callback: called when data arrives from the network.
@@ -465,57 +654,6 @@ static size_t stream_write_callback(void* ptr, size_t size, size_t nmemb, void* 
   return chunk_len;
 }
 
-int runner_fetch_url_stream(const char* url, TextBuffer*                   buf,
-                            void (*on_progress)(void* progress_ctx), void* progress_ctx) {
-  CURLM*      multi;
-  CURL*       curl;
-  int         running   = 0;
-  long        http_code = 0;
-  FetchStream fs;
-  CURLMsg*    msg;
-
-  fs.buf          = buf;
-  fs.partial      = dup_str("");
-  fs.on_progress  = on_progress;
-  fs.progress_ctx = progress_ctx;
-
-  curl = curl_easy_init();
-  if (!curl) {
-    free(fs.partial);
-    return -1;
-  }
-
-  multi = curl_multi_init();
-  curl_easy_setopt(curl, CURLOPT_URL, url);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, stream_write_callback);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &fs);
-  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
-  curl_multi_add_handle(multi, curl);
-
-  do {
-    curl_multi_perform(multi, &running);
-    if (running) curl_multi_wait(multi, NULL, 0, 50, NULL);
-  } while (running);
-
-  if (fs.partial[0]) {
-    ensure_line_capacity(buf, buf->line_count + 1);
-    buf->lines[buf->line_count++] = fs.partial;
-  } else {
-    free(fs.partial);
-  }
-
-  msg = curl_multi_info_read(multi, &running);
-  if (msg) curl_easy_getinfo(msg->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
-
-  curl_multi_remove_handle(multi, curl);
-  curl_multi_cleanup(multi);
-  curl_easy_cleanup(curl);
-
-  if (http_code != 200) return -1;
-  return 0;
-}
-
 int runner_fetch_stream_start(FetchStream* fs, const char* url, TextBuffer* buf,
                               void (*on_progress)(void* ctx), void* progress_ctx) {
   CURLM* multi;
@@ -536,9 +674,11 @@ int runner_fetch_stream_start(FetchStream* fs, const char* url, TextBuffer* buf,
 
   multi = curl_multi_init();
   curl_easy_setopt(curl, CURLOPT_URL, url);
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "thingy/1.0");
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, stream_write_callback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, fs);
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
   curl_multi_add_handle(multi, curl);
 

@@ -20,10 +20,15 @@ typedef struct {
   long  http_code;
 } FetchStream;
 
+typedef struct {
+  int   verbose;
+  int   max_retries;
+  void (*on_status)(void* ctx, const char* msg);
+  void* status_ctx;
+} FetchOptions;
+
 RunResult runner_smart_run(const char* file_path, const char* lang_override, char** output);
-int       runner_fetch_url(const char* url, char** content);
-int       runner_fetch_url_stream(const char* url, TextBuffer* buf, void (*on_progress)(void* ctx),
-                                  void* ctx);
+int       runner_fetch_url(const char* url, char** content, const FetchOptions* opts);
 
 int  runner_fetch_stream_start(FetchStream* fs, const char* url, TextBuffer* buf,
                                void (*on_progress)(void* ctx), void* progress_ctx);

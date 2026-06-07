@@ -73,17 +73,35 @@ Force a specific language:
 thingy --run --lang python https://example.com/script.txt
 ```
 
+Verbose mode shows fetch progress, redirects, retries, and status codes on stderr:
+
+```bash
+thingy --run -v https://example.com/main.txt
+```
+
+Sample output:
+
+```
+thingy: GET https://example.com/main.txt
+thingy:   -> https://new.example.com/main.txt
+thingy: 200 OK
+```
+
+On failure, retries up to 3 times with exponential backoff on network errors and 5xx responses. Errors include the URL, status code, and a hint when applicable (e.g. auth required for 401/403).
+
+`-v` without a URL prints the version.
+
 ## 🍬 Battle Stations
 
-| Key  | Action                                       |
-| :--- | :------------------------------------------- |
-| `^S` | Backup. Real warriors prepare for the worst. |
-| `^R` | Launch. Let 'em have it.                     |
-| `^F` | Camouflage. Hide the mess.                   |
-| `^O` | Intel. See what went wrong.                  |
-| `^L` | Language select. Choose your weapon.         |
-| `^Q` | Retreat. Live to fight another day.          |
-| `Tab`| Insert 4 spaces. indentation is discipline.  |
+| Key   | Action                                       |
+| :---- | :------------------------------------------- |
+| `^S`  | Backup. Real warriors prepare for the worst. |
+| `^R`  | Launch. Let 'em have it.                     |
+| `^F`  | Camouflage. Hide the mess.                   |
+| `^O`  | Intel. See what went wrong.                  |
+| `^L`  | Language select. Choose your weapon.         |
+| `^Q`  | Retreat. Live to fight another day.          |
+| `Tab` | Insert 4 spaces. indentation is discipline.  |
 
 ### Output Panel
 
