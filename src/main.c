@@ -31,7 +31,7 @@ static void print_usage(void) {
 }
 
 static int check_terminal(void) {
-  if (!isatty(STDOUT_FILENO) || !isatty(STDIN_FILENO)) {
+  if (!isatty(STDOUT_FILENO)) {
     fprintf(stderr,
             "\n \xF0\x9F\x8C\xB8 thingy needs a real terminal, soldier.\n"
             "    Stop piping me into the void. Open a terminal and try again.\n\n");
@@ -50,19 +50,31 @@ static int check_terminal(void) {
 static int init_editor(Editor* ed, const char* filename) {
   char err[256];
   int  is_url;
+  int  is_stdin = !isatty(STDIN_FILENO);
 
   memset(ed, 0, sizeof(*ed));
   buffer_init(&ed->buffer);
   folds_init(&ed->folds);
   if (ed->buffer.line_count <= 0) return -1;
 
-  snprintf(ed->filename, sizeof(ed->filename), "%s",
-           (filename && filename[0]) ? filename : "untitled.txt");
+  if (is_stdin) {
+    snprintf(ed->filename, sizeof(ed->filename), "stdin");
+  } else {
+    snprintf(ed->filename, sizeof(ed->filename), "%s",
+             (filename && filename[0]) ? filename : "untitled.txt");
+  }
 
-  is_url =
-      filename && (strncmp(filename, "http://", 7) == 0 || strncmp(filename, "https://", 8) == 0);
+  is_url = !is_stdin && filename &&
+           (strncmp(filename, "http://", 7) == 0 || strncmp(filename, "https://", 8) == 0);
 
-  if (is_url) {
+  if (is_stdin) {
+    init_ncurses();
+    if (buffer_load_stdin(&ed->buffer, err, sizeof(err)) != 0) {
+      set_status(ed, "Read failed: %s", err);
+    } else {
+      set_status(ed, "Read from stdin (%d lines)", ed->buffer.line_count);
+    }
+  } else if (is_url) {
     init_ncurses();
     set_status(ed, "Fetching %s ...", filename);
     getmaxyx(stdscr, ed->screen_rows, ed->screen_cols);
@@ -216,8 +228,8 @@ int main(int argc, char** argv) {
     }
 
     if (!path) {
-      printf("thingy %s\n", GIT_VERSION);
-      return 0;
+      fprintf(stderr, "Usage: thingy --run [-v] [--lang <lang>] <file|url>\n");
+      return 1;
     }
 
     return run_cli(path, lang, verbose);

@@ -150,6 +150,66 @@ int buffer_load_file(TextBuffer* buf, const char* path, char* err, size_t err_si
   return 0;
 }
 
+int buffer_load_stdin(TextBuffer* buf, char* err, size_t err_size) {
+  char* line = NULL;
+  size_t len  = 0;
+  size_t cap  = 0;
+  int    c;
+
+  clear_lines(buf);
+
+  cap  = 64;
+  line = malloc(cap);
+  if (!line) {
+    snprintf(err, err_size, "out of memory");
+    return -1;
+  }
+
+  while ((c = fgetc(stdin)) != EOF) {
+    if (c == '\r') continue;
+    if (c == '\n') {
+      line[len] = '\0';
+      if (append_owned_line(buf, line) != 0) {
+        snprintf(err, err_size, "out of memory");
+        return -1;
+      }
+      cap  = 64;
+      len  = 0;
+      line = malloc(cap);
+      if (!line) {
+        snprintf(err, err_size, "out of memory");
+        return -1;
+      }
+      continue;
+    }
+
+    if (len + 1 >= cap) {
+      char* tmp;
+      cap *= 2;
+      tmp = realloc(line, cap);
+      if (!tmp) {
+        free(line);
+        snprintf(err, err_size, "out of memory");
+        return -1;
+      }
+      line = tmp;
+    }
+    line[len++] = (char)c;
+  }
+
+  if (len > 0 || buf->line_count == 0) {
+    line[len] = '\0';
+    if (append_owned_line(buf, line) != 0) {
+      snprintf(err, err_size, "out of memory");
+      return -1;
+    }
+  } else {
+    free(line);
+  }
+
+  return 0;
+}
+
 int buffer_save_file(const TextBuffer* buf, const char* path, char* err, size_t err_size) {
   FILE* fp;
   int   i;
