@@ -12,7 +12,7 @@ description: How to install thingy — the pink TUI editor.
 ## Homebrew (macOS)
 
 ```bash
-brew tap velox0/brew
+brew tap velox0/tap
 brew install thingy
 ```
 
